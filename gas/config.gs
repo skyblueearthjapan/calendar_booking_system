@@ -1,6 +1,12 @@
 /** config.gs */
 
 const CFG = {
+  // スプレッドシートID（スクリプトプロパティ 'SPREADSHEET_ID' から取得）
+  // 設定方法：GASエディタ → 歯車（プロジェクトの設定）→ スクリプトプロパティ → プロパティを追加
+  //   プロパティ: SPREADSHEET_ID
+  //   値: スプレッドシートのID（URLの /d/ と /edit の間の文字列）
+  SPREADSHEET_ID: PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID'),
+
   TZ: Session.getScriptTimeZone(), // SpreadsheetのTZに合わせる
   SHEETS: {
     MASTER: 'マスター',

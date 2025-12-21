@@ -1,6 +1,12 @@
 /** sheets.gs */
 
 function _ss() {
+  // スクリプトプロパティにSPREADSHEET_IDが設定されている場合はそれを使用
+  // 設定されていない場合はgetActiveSpreadsheet()にフォールバック
+  const id = CFG.SPREADSHEET_ID;
+  if (id) {
+    return SpreadsheetApp.openById(id);
+  }
   return SpreadsheetApp.getActiveSpreadsheet();
 }
 
