@@ -88,19 +88,24 @@ function readAllReservations_() {
 }
 
 function rowToReservation_(r, map) {
-  const get = (key) => r[map[key] - 1];
+  // 日本語ヘッダー名で値を取得
+  const H = CFG.HEADER_MAP;
+  const get = (headerName) => {
+    const colIndex = map[headerName];
+    return colIndex ? r[colIndex - 1] : '';
+  };
   return {
-    reservationId: String(get('reservationId') || '').trim(),
-    date: String(get('date') || '').trim(),
-    startTime: String(get('startTime') || '').trim(),
-    endTime: String(get('endTime') || '').trim(),
-    room: String(get('room') || '').trim(),
-    name: String(get('name') || '').trim(),
-    customerName: String(get('title') || '').trim(),      // title=お客様名
-    meetingDetail: String(get('note') || '').trim(),      // note=打ち合わせ内容
-    status: String(get('status') || '').trim(),
-    createdAt: String(get('createdAt') || '').trim(),
-    updatedAt: String(get('updatedAt') || '').trim(),
+    reservationId: String(get(H.reservationId) || '').trim(),
+    date: String(get(H.date) || '').trim(),
+    startTime: String(get(H.startTime) || '').trim(),
+    endTime: String(get(H.endTime) || '').trim(),
+    room: String(get(H.room) || '').trim(),
+    name: String(get(H.name) || '').trim(),
+    customerName: String(get(H.customerName) || '').trim(),
+    meetingDetail: String(get(H.meetingDetail) || '').trim(),
+    status: String(get(H.status) || '').trim(),
+    createdAt: String(get(H.createdAt) || '').trim(),
+    updatedAt: String(get(H.updatedAt) || '').trim(),
   };
 }
 
@@ -108,20 +113,23 @@ function rowToReservation_(r, map) {
 function appendReservation_(payload) {
   const sh = _sheet(CFG.SHEETS.RESERVATIONS);
   const map = getHeaderMap_(sh, 2);
+  const H = CFG.HEADER_MAP;
 
   const now = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd HH:mm:ss');
+
+  // 日本語ヘッダー名をキーにしてデータを格納
   const row = {};
-  row['reservationId'] = payload.reservationId;
-  row['date'] = payload.date;
-  row['startTime'] = payload.startTime;
-  row['endTime'] = payload.endTime;
-  row['room'] = payload.room;
-  row['name'] = payload.name;
-  row['title'] = payload.customerName || '';
-  row['note'] = payload.meetingDetail || '';
-  row['status'] = 'active';
-  row['createdAt'] = now;
-  row['updatedAt'] = now;
+  row[H.reservationId] = payload.reservationId;
+  row[H.date] = payload.date;
+  row[H.startTime] = payload.startTime;
+  row[H.endTime] = payload.endTime;
+  row[H.room] = payload.room;
+  row[H.name] = payload.name;
+  row[H.customerName] = payload.customerName || '';
+  row[H.meetingDetail] = payload.meetingDetail || '';
+  row[H.status] = 'active';
+  row[H.createdAt] = now;
+  row[H.updatedAt] = now;
 
   // シートの列順に合わせて配列化
   const lastCol = sh.getLastColumn();

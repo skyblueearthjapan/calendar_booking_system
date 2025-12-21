@@ -15,12 +15,27 @@ const CFG = {
     VIEW_2WEEKS: 'View_2weeks',
   },
 
-  // Reservationsの必須ヘッダー（意味：title=お客様名, note=打ち合わせ内容）
+  // Reservationsの必須ヘッダー（日本語ヘッダーに対応）
   RES_HEADERS: [
-    'reservationId', 'date', 'startTime', 'endTime',
-    'room', 'name', 'title', 'note',
-    'status', 'createdAt', 'updatedAt'
+    '予約ID', '日付', '開始時間', '終了時間',
+    '会議室名', '名前', 'お客様名', '打合せ内容',
+    'ステータス', '予約日時', '更新日時'
   ],
+
+  // ヘッダー名マッピング（内部キー → シートのヘッダー名）
+  HEADER_MAP: {
+    reservationId: '予約ID',
+    date: '日付',
+    startTime: '開始時間',
+    endTime: '終了時間',
+    room: '会議室名',
+    name: '名前',
+    customerName: 'お客様名',
+    meetingDetail: '打合せ内容',
+    status: 'ステータス',
+    createdAt: '予約日時',
+    updatedAt: '更新日時',
+  },
 
   BUSINESS: {
     START: '08:00',
