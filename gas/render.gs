@@ -45,8 +45,12 @@ function renderDay(dateStr) {
     const col = roomToCol[r.room];
     if (!col) return;
 
-    const r0 = timeToRow[r.startTime];
-    const r1 = timeToRow[r.endTime];
+    // 時間を正規化（9:00 → 09:00）
+    const startTimeNorm = normalizeTime_(r.startTime);
+    const endTimeNorm = normalizeTime_(r.endTime);
+
+    const r0 = timeToRow[startTimeNorm];
+    const r1 = timeToRow[endTimeNorm];
     if (!r0 || !r1) return;
 
     const height = r1 - r0; // endは次枠の開始なので差分
@@ -60,7 +64,7 @@ function renderDay(dateStr) {
 
     const customer = r.customerName ? `\n${r.customerName}` : '';
     const meeting = r.meetingDetail ? `\n${trimMeetingDetail_(r.meetingDetail)}` : '';
-    const text = `${r.name}\n${r.startTime}-${r.endTime}${customer}${meeting}`;
+    const text = `${r.name}\n${startTimeNorm}-${endTimeNorm}${customer}${meeting}`;
 
     block.setValue(text);
     block.setHorizontalAlignment('center');
@@ -129,4 +133,22 @@ function buildTimeSlots_() {
     t = new Date(t.getTime() + CFG.BUSINESS.SLOT_MIN * 60 * 1000);
   }
   return slots;
+}
+
+/** 時間を HH:mm 形式に正規化（9:00 → 09:00） */
+function normalizeTime_(timeStr) {
+  if (!timeStr) return '';
+  const t = String(timeStr).trim();
+  // すでに HH:mm 形式の場合はそのまま
+  if (/^\d{2}:\d{2}$/.test(t)) return t;
+  // H:mm 形式の場合は 0 を追加
+  if (/^\d{1}:\d{2}$/.test(t)) return '0' + t;
+  // その他の形式は変換を試みる
+  const parts = t.split(':');
+  if (parts.length === 2) {
+    const h = String(parts[0]).padStart(2, '0');
+    const m = String(parts[1]).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  return t;
 }
