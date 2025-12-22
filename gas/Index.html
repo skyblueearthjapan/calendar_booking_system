@@ -3,932 +3,944 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>カレンダー予約</title>
+  <title>会議室予約</title>
   <style>
     :root{
       --navy:#0B3A66;
       --navy2:#124A7A;
       --bg:#F5F7FB;
       --card:#FFFFFF;
-      --line:#D9E2EF;
+      --line:#CBD5E1;
+      --line-light:#E2E8F0;
       --muted:#6B7280;
       --text:#111827;
-      --shadow: 0 10px 25px rgba(17,24,39,.08);
-      --radius: 14px;
+      --shadow: 0 4px 12px rgba(17,24,39,.06);
+      --radius: 8px;
     }
-    *{box-sizing:border-box}
+    *{box-sizing:border-box;margin:0;padding:0}
     body{
-      margin:0;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
       color:var(--text);
       background:var(--bg);
+      min-height:100vh;
     }
+
+    /* Header */
     .topbar{
       background: linear-gradient(90deg, var(--navy), var(--navy2));
       color:#fff;
-      padding:16px 18px;
+      padding:12px 16px;
       position:sticky;
       top:0;
-      z-index:10;
-      box-shadow: 0 6px 16px rgba(0,0,0,.12);
+      z-index:100;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
     }
-    .topbar .row{
+    .topbar-inner{
+      max-width:1400px;
+      margin:0 auto;
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:12px;
-      max-width: 1200px;
-      margin:0 auto;
+      flex-wrap:wrap;
     }
     .brand{
       display:flex;
       align-items:center;
-      gap:10px;
-      font-weight: 800;
-      letter-spacing:.02em;
+      gap:8px;
+      font-weight:800;
+      font-size:16px;
+    }
+    .brand-dot{
+      width:10px;height:10px;border-radius:50%;background:#fff;
     }
     .badge{
-      font-size:12px;
-      padding:4px 8px;
-      border:1px solid rgba(255,255,255,.35);
+      font-size:11px;
+      padding:3px 8px;
+      border:1px solid rgba(255,255,255,.3);
       border-radius:999px;
-      opacity:.95;
+      opacity:.9;
     }
-    .tabs{
+
+    /* Week Tabs */
+    .week-tabs{
       display:flex;
-      gap:8px;
-      align-items:center;
+      gap:4px;
+      flex-wrap:wrap;
     }
-    .tabbtn{
-      background:rgba(255,255,255,.12);
+    .week-tab{
+      background:rgba(255,255,255,.1);
+      border:1px solid rgba(255,255,255,.2);
       color:#fff;
-      border:1px solid rgba(255,255,255,.24);
-      padding:8px 12px;
-      border-radius: 10px;
+      padding:6px 10px;
+      border-radius:8px;
       cursor:pointer;
+      font-size:12px;
       font-weight:700;
       transition:.15s;
-      user-select:none;
+      text-align:center;
+      min-width:70px;
     }
-    .tabbtn:hover{background:rgba(255,255,255,.18)}
-    .tabbtn.active{
+    .week-tab:hover{background:rgba(255,255,255,.2)}
+    .week-tab.active{
       background:#fff;
       color:var(--navy);
       border-color:#fff;
     }
+    .week-tab .date{font-size:13px;font-weight:800}
+    .week-tab .count{font-size:10px;opacity:.85;margin-top:2px}
 
+    /* Main Container */
     .container{
-      max-width:1200px;
-      margin: 18px auto 28px;
-      padding: 0 14px;
+      max-width:1400px;
+      margin:0 auto;
+      padding:16px;
     }
 
-    .grid{
-      display:grid;
-      grid-template-columns: 1.6fr .9fr;
-      gap: 14px;
-    }
-    @media (max-width: 980px){
-      .grid{grid-template-columns:1fr}
-    }
-
-    .card{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .cardHeader{
-      padding:14px 16px;
-      background: linear-gradient(180deg, #0B3A66, #0B3A66);
-      color:#fff;
+    /* Day Info */
+    .day-info{
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap:10px;
+      margin-bottom:12px;
+      flex-wrap:wrap;
+      gap:8px;
     }
-    .cardHeader .title{
-      font-weight: 900;
-      letter-spacing:.02em;
+    .day-title{
+      font-size:18px;
+      font-weight:900;
+      color:var(--navy);
     }
-    .cardBody{
-      padding:14px 16px 16px;
+    .day-nav{
+      display:flex;
+      gap:6px;
     }
-    .muted{color:var(--muted); font-size:12px}
-    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-    .spacer{flex:1}
-
-    .btn{
-      appearance:none;
-      border:none;
-      background: var(--navy);
-      color:#fff;
-      padding:10px 12px;
-      border-radius: 12px;
-      font-weight:800;
+    .nav-btn{
+      background:#fff;
+      border:1px solid var(--line);
+      padding:6px 12px;
+      border-radius:6px;
       cursor:pointer;
+      font-weight:700;
+      font-size:12px;
       transition:.15s;
     }
-    .btn:hover{filter:brightness(1.08)}
-    .btn.secondary{
+    .nav-btn:hover{background:var(--bg)}
+
+    /* Grid Table (Excel-like) */
+    .grid-wrap{
       background:#fff;
-      color:var(--navy);
       border:1px solid var(--line);
+      border-radius:var(--radius);
+      overflow:auto;
+      box-shadow:var(--shadow);
     }
-    .btn.ghost{
-      background:transparent;
-      border:1px solid rgba(255,255,255,.35);
-      color:#fff;
-      padding:8px 10px;
+    .day-grid{
+      display:grid;
+      grid-template-columns: 70px repeat(var(--room-count), 1fr);
+      min-width:500px;
     }
-    .btn:disabled{opacity:.5; cursor:not-allowed}
-
-    .pill{
-      background:#EFF6FF;
-      color:#1D4ED8;
-      border:1px solid #DBEAFE;
-      padding:6px 10px;
-      border-radius:999px;
-      font-weight:800;
-      font-size:12px;
-    }
-
-    /* DAY table */
-    table{
-      width:100%;
-      border-collapse:separate;
-      border-spacing:0;
-    }
-    thead th{
-      position:sticky;
-      top:0;
-      z-index:1;
-    }
-    th, td{
+    .grid-cell{
       border-right:1px solid var(--line);
       border-bottom:1px solid var(--line);
-      padding:10px 10px;
-      vertical-align:top;
-      font-size:13px;
+      padding:0;
+      min-height:40px;
+      position:relative;
       background:#fff;
     }
-    th:first-child, td:first-child{border-left:1px solid var(--line)}
-    thead th{
-      background:#0B3A66;
-      color:#fff;
-      font-weight:900;
-      text-align:center;
-    }
-    .timeCell{
-      width:90px;
-      text-align:center;
-      font-weight:900;
-      background:#F8FAFC;
-      color:#111827;
-    }
-    .halfHour{background:#F1F5F9}
-    .slot{
-      min-height:44px;
-      border-radius:10px;
-      padding:8px 10px;
-      display:flex;
-      flex-direction:column;
-      gap:2px;
-      border:1px solid rgba(17,24,39,.06);
-      box-shadow: 0 6px 16px rgba(17,24,39,.06);
-      white-space:pre-wrap;
-      word-break:break-word;
-    }
-    .slot .name{font-weight:900}
-    .slot .time{font-weight:800; font-size:12px; opacity:.9}
-    .slot .customer{font-weight:800; font-size:12px}
-    .slot .detail{font-size:12px; color:#111827}
-    .slot .detail.muted{color:var(--muted)}
-    .slotClickable{cursor:pointer}
-    .slotClickable:hover{filter:brightness(1.03)}
+    .grid-cell:last-child{border-right:none}
+    .grid-row:last-child .grid-cell{border-bottom:none}
 
-    .legend{
-      display:flex; gap:8px; align-items:center; flex-wrap:wrap;
-      padding-top:10px;
+    /* Header Row */
+    .grid-header{
+      background:var(--navy);
+      color:#fff;
+      font-weight:800;
+      font-size:13px;
+      text-align:center;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:44px;
+      border-bottom:2px solid var(--navy2) !important;
     }
-    .swatch{
-      display:flex; gap:6px; align-items:center;
-      border:1px solid var(--line);
-      background:#fff;
-      padding:6px 10px;
-      border-radius:999px;
+
+    /* Time Column */
+    .time-cell{
+      background:#F8FAFC;
+      font-weight:800;
       font-size:12px;
+      color:#374151;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-right:2px solid var(--line) !important;
+    }
+    .time-cell.half{background:#F1F5F9}
+
+    /* Empty Cell (clickable) */
+    .empty-cell{
+      cursor:pointer;
+      transition:background .1s;
+    }
+    .empty-cell:hover{
+      background:#EEF2FF;
+    }
+    .empty-cell.half{background:#FAFAFA}
+    .empty-cell.half:hover{background:#EEF2FF}
+
+    /* Reservation Cell */
+    .res-cell{
+      cursor:pointer;
+    }
+    .res-cell .res-content{
+      padding:4px 6px;
+      font-size:11px;
+      line-height:1.3;
+    }
+    .res-cell .res-name{font-weight:800;font-size:12px}
+    .res-cell .res-time{font-weight:700;opacity:.85}
+    .res-cell .res-customer{font-weight:700;margin-top:1px}
+    .res-cell .res-detail{color:var(--muted);margin-top:1px}
+    .res-cell.continuation{
+      /* Middle cells: just color, no text */
+    }
+
+    /* Legend */
+    .legend{
+      display:flex;
+      gap:8px;
+      margin-top:12px;
+      flex-wrap:wrap;
+    }
+    .legend-item{
+      display:flex;
+      align-items:center;
+      gap:5px;
+      font-size:12px;
+      font-weight:700;
+      background:#fff;
+      border:1px solid var(--line);
+      padding:4px 10px;
+      border-radius:999px;
+    }
+    .legend-dot{
+      width:12px;height:12px;border-radius:3px;
+      border:1px solid rgba(0,0,0,.1);
+    }
+
+    /* Modal */
+    .modal-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(17,24,39,.5);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:200;
+      padding:16px;
+    }
+    .modal-overlay.show{display:flex}
+    .modal{
+      background:#fff;
+      border-radius:12px;
+      width:100%;
+      max-width:420px;
+      box-shadow:0 20px 50px rgba(0,0,0,.25);
+      overflow:hidden;
+    }
+    .modal-header{
+      background:linear-gradient(90deg, var(--navy), var(--navy2));
+      color:#fff;
+      padding:12px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
       font-weight:800;
     }
-    .dot{width:10px; height:10px; border-radius:999px; border:1px solid rgba(0,0,0,.08)}
-    .hr{
-      height:1px; background:var(--line); margin:12px 0;
+    .modal-close{
+      background:transparent;
+      border:1px solid rgba(255,255,255,.3);
+      color:#fff;
+      width:28px;height:28px;
+      border-radius:6px;
+      cursor:pointer;
+      font-size:16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .modal-close:hover{background:rgba(255,255,255,.1)}
+    .modal-body{
+      padding:16px;
     }
 
     /* Form */
-    .formGrid{
+    .form-group{margin-bottom:12px}
+    .form-label{
+      font-size:12px;
+      font-weight:800;
+      color:var(--navy);
+      margin-bottom:4px;
+      display:block;
+    }
+    .form-input, .form-select, .form-textarea{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:8px;
+      font-size:14px;
+      background:#fff;
+      outline:none;
+      transition:border .15s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus{
+      border-color:var(--navy);
+    }
+    .form-textarea{min-height:80px;resize:vertical}
+    .form-row{
       display:grid;
-      grid-template-columns: 1fr;
+      grid-template-columns:1fr 1fr;
       gap:10px;
     }
-    label{font-size:12px; font-weight:900; color:#0B3A66}
-    input, select, textarea{
+    .form-hint{font-size:11px;color:var(--muted);margin-top:3px}
+    .form-btn{
       width:100%;
-      padding:10px 10px;
-      border-radius: 12px;
-      border:1px solid var(--line);
-      background:#fff;
-      font-size:14px;
-      outline:none;
-    }
-    textarea{min-height:90px; resize:vertical}
-    .hint{font-size:12px; color:var(--muted)}
-    .toast{
-      position: fixed;
-      right: 16px;
-      bottom: 16px;
-      background: #111827;
+      background:var(--navy);
       color:#fff;
-      padding: 10px 12px;
-      border-radius: 12px;
-      box-shadow: 0 14px 30px rgba(0,0,0,.2);
+      border:none;
+      padding:12px;
+      border-radius:8px;
+      font-weight:800;
+      font-size:14px;
+      cursor:pointer;
+      transition:.15s;
+      margin-top:8px;
+    }
+    .form-btn:hover{filter:brightness(1.1)}
+    .form-btn:disabled{opacity:.5;cursor:not-allowed}
+
+    /* Detail Modal */
+    .detail-grid{
+      display:grid;
+      grid-template-columns:100px 1fr;
+      gap:8px;
+      font-size:14px;
+    }
+    .detail-grid .label{color:var(--muted);font-weight:700}
+    .detail-grid .value{font-weight:600}
+
+    /* Toast */
+    .toast{
+      position:fixed;
+      bottom:16px;
+      right:16px;
+      background:#111827;
+      color:#fff;
+      padding:10px 16px;
+      border-radius:8px;
+      font-weight:700;
+      font-size:13px;
+      box-shadow:0 10px 30px rgba(0,0,0,.2);
       display:none;
-      max-width: 420px;
-      z-index:999;
+      z-index:300;
     }
     .toast.show{display:block}
 
-    /* 2weeks */
-    .weeksWrap{
-      display:grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap:10px;
+    /* Responsive */
+    @media(max-width:768px){
+      .week-tabs{gap:3px}
+      .week-tab{min-width:auto;padding:5px 7px;font-size:11px}
+      .week-tab .date{font-size:11px}
+      .day-grid{grid-template-columns:60px repeat(var(--room-count), minmax(100px, 1fr))}
     }
-    @media (max-width: 980px){
-      .weeksWrap{grid-template-columns: repeat(2, 1fr);}
-    }
-    .dayCard{
-      background:#fff;
-      border:1px solid var(--line);
-      border-radius: 14px;
-      padding:10px;
-      box-shadow: 0 10px 24px rgba(17,24,39,.06);
-      cursor:pointer;
-      transition:.12s;
-      min-height:92px;
-    }
-    .dayCard:hover{transform: translateY(-1px)}
-    .dayCard .d{font-weight:900}
-    .dayCard .sub{font-size:12px; color:var(--muted); margin-top:2px}
-    .countList{margin-top:8px; display:flex; flex-direction:column; gap:4px}
-    .countRow{
-      display:flex; align-items:center; justify-content:space-between;
-      font-size:12px; font-weight:800;
-      padding:4px 6px;
-      border-radius:10px;
-      background:#F8FAFC;
-      border:1px solid #EEF2F7;
-    }
-
-    /* modal */
-    .modalBack{
-      position:fixed; inset:0;
-      background: rgba(17,24,39,.55);
-      display:none;
-      z-index:1000;
-      padding: 20px;
-    }
-    .modalBack.show{display:flex; align-items:center; justify-content:center}
-    .modal{
-      width:min(640px, 100%);
-      background:#fff;
-      border-radius: 18px;
-      box-shadow: 0 30px 70px rgba(0,0,0,.25);
-      overflow:hidden;
-      border:1px solid rgba(255,255,255,.2);
-    }
-    .modalHead{
-      background: linear-gradient(90deg, var(--navy), var(--navy2));
-      color:#fff;
-      padding:12px 14px;
-      display:flex; align-items:center; gap:10px;
-      font-weight:900;
-    }
-    .modalBody{padding:14px 16px}
-    .kv{display:grid; grid-template-columns: 120px 1fr; gap:8px; font-size:14px}
-    .kv div:nth-child(odd){color:var(--muted); font-weight:900}
   </style>
 </head>
-
 <body>
-  <div class="topbar">
-    <div class="row">
-      <div class="brand">
-        <div style="width:10px;height:10px;border-radius:999px;background:#fff;opacity:.95"></div>
-        <div>カレンダー予約</div>
-        <div class="badge">Web入力 / シート表示</div>
-      </div>
 
-      <div class="tabs">
-        <div class="tabbtn active" id="tabDay" onclick="showView('day')">DAYビュー</div>
-        <div class="tabbtn" id="tab2w" onclick="showView('2w')">2週間</div>
-      </div>
+<!-- Header with Week Tabs -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <span>会議室予約</span>
+      <span class="badge">Web入力 / シート表示</span>
+    </div>
+    <div class="week-tabs" id="weekTabs">
+      <!-- 7 day tabs injected -->
+    </div>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="container">
+  <!-- Day Info -->
+  <div class="day-info">
+    <div class="day-title" id="dayTitle">----</div>
+    <div class="day-nav">
+      <button class="nav-btn" onclick="shiftDay(-1)">&#9664; 前日</button>
+      <button class="nav-btn" onclick="goToday()">今日</button>
+      <button class="nav-btn" onclick="shiftDay(1)">翌日 &#9654;</button>
     </div>
   </div>
 
-  <div class="container">
-    <!-- DAY VIEW -->
-    <div id="viewDay" class="grid">
-      <div class="card">
-        <div class="cardHeader">
-          <div class="title">カレンダー予約（DAYビュー）</div>
-          <div class="row">
-            <button class="btn ghost" onclick="shiftDay(-1)">前日</button>
-            <div class="pill" id="dayLabel">----</div>
-            <button class="btn ghost" onclick="shiftDay(1)">翌日</button>
-            <button class="btn ghost" onclick="goToday()">今日</button>
-          </div>
-        </div>
-        <div class="cardBody">
-          <div class="row">
-            <div class="muted">表示日：<b id="dayDateText">----</b></div>
-            <div class="spacer"></div>
-            <div class="muted">※打ち合わせ内容は省略表示（クリックで全文）</div>
-          </div>
-
-          <div class="hr"></div>
-
-          <div style="overflow:auto; border-radius: 14px; border:1px solid var(--line);">
-            <table id="dayTable">
-              <thead>
-                <tr id="dayHeadRow">
-                  <th style="width:90px;">Time</th>
-                  <!-- rooms injected -->
-                </tr>
-              </thead>
-              <tbody id="dayBody">
-                <!-- time rows injected -->
-              </tbody>
-            </table>
-          </div>
-
-          <div class="legend" id="roomLegend"></div>
-        </div>
-      </div>
-
-      <!-- FORM -->
-      <div class="card">
-        <div class="cardHeader">
-          <div class="title">予約入力フォーム</div>
-          <div class="muted">（今日から14日内のみ）</div>
-        </div>
-        <div class="cardBody">
-          <div class="formGrid">
-            <div>
-              <label>日付</label>
-              <input type="date" id="fDate" />
-              <div class="hint">DAYビューの表示日と連動します</div>
-            </div>
-
-            <div class="row" style="gap:8px">
-              <div style="flex:1">
-                <label>開始</label>
-                <select id="fStart"></select>
-              </div>
-              <div style="flex:1">
-                <label>終了</label>
-                <select id="fEnd"></select>
-              </div>
-            </div>
-
-            <div>
-              <label>会議室</label>
-              <select id="fRoom"></select>
-            </div>
-
-            <div>
-              <label>作業者</label>
-              <select id="fName"></select>
-            </div>
-
-            <div>
-              <label>お客様名（任意）</label>
-              <input type="text" id="fCustomer" placeholder="例：株式会社〇〇 ご担当：△△様" />
-            </div>
-
-            <div>
-              <label>打ち合わせ内容（任意）</label>
-              <textarea id="fDetail" placeholder="例：導入説明 / 要件ヒアリング / 見積り相談 など"></textarea>
-              <div class="hint">DAYビュー表示は省略されます（クリックで全文表示）</div>
-            </div>
-
-            <button class="btn" id="btnCreate" onclick="submitReservation()">予約する</button>
-            <div class="hint" id="formHint"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 2 WEEKS VIEW -->
-    <div id="view2w" class="card" style="display:none;">
-      <div class="cardHeader">
-        <div class="title">2週間予約（会議室ごと）</div>
-        <div class="row">
-          <div class="muted">基準日：<b id="baseLabel">----</b></div>
-          <button class="btn ghost" onclick="goToday()">今日</button>
-        </div>
-      </div>
-      <div class="cardBody">
-        <div class="muted">日付カードをクリックすると、その日のDAYビューへ移動します。</div>
-        <div class="hr"></div>
-        <div class="weeksWrap" id="weeksGrid"></div>
-      </div>
-    </div>
-
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <!-- Modal for full detail -->
-  <div class="modalBack" id="modalBack" onclick="closeModal(event)">
-    <div class="modal" onclick="event.stopPropagation()">
-      <div class="modalHead">
-        <div style="flex:1" id="mTitle">予約詳細</div>
-        <button class="btn secondary" onclick="hideModal()">閉じる</button>
-      </div>
-      <div class="modalBody" id="modalBody"></div>
+  <!-- DAY Grid -->
+  <div class="grid-wrap">
+    <div class="day-grid" id="dayGrid">
+      <!-- Grid injected -->
     </div>
   </div>
+
+  <!-- Legend -->
+  <div class="legend" id="legend"></div>
+</div>
+
+<!-- Reservation Form Modal -->
+<div class="modal-overlay" id="formModal">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>予約入力</span>
+      <button class="modal-close" onclick="closeFormModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">日付</label>
+        <input type="date" class="form-input" id="fDate" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">開始</label>
+          <select class="form-select" id="fStart"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">終了</label>
+          <select class="form-select" id="fEnd"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">会議室</label>
+        <select class="form-select" id="fRoom"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">作業者</label>
+        <select class="form-select" id="fName"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">お客様名（任意）</label>
+        <input type="text" class="form-input" id="fCustomer" placeholder="例：株式会社〇〇 ご担当：△△様" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">打ち合わせ内容（任意）</label>
+        <textarea class="form-textarea" id="fDetail" placeholder="例：導入説明 / 要件ヒアリング など"></textarea>
+      </div>
+      <button class="form-btn" id="btnSubmit" onclick="submitReservation()">予約する</button>
+      <div class="form-hint" id="formHint"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal" onclick="closeDetailModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span>予約詳細</span>
+      <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="detailBody">
+      <!-- Detail injected -->
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
 
 <script>
-  // =========================
-  // State
-  // =========================
-  const state = {
-    masters: { names: [], rooms: [], slots: [] },
-    window: { today: '', from: '', to: '' },
-    selectedDate: '',
-    reservationsByDate: {}, // date -> Reservation[]
-    roomColors: {},         // (Web側は固定色を持たないので、GAS側色は別。ここは簡易色)
+// =========================
+// State
+// =========================
+const state = {
+  masters: { names: [], rooms: [], slots: [] },
+  window: { today: '', from: '', to: '' },
+  selectedDate: '',
+  weekDays: [],
+  reservationsByDate: {},
+  roomColors: {},
+  weekCounts: {} // date -> total count
+};
+
+// =========================
+// Utils
+// =========================
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function ymd(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return ymd(d);
+}
+
+function getDayOfWeek(dateStr) {
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  const d = new Date(dateStr + 'T00:00:00');
+  return days[d.getDay()];
+}
+
+function formatDateShort(dateStr) {
+  const parts = dateStr.split('-');
+  return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+}
+
+function clampWindow(dateStr) {
+  if (dateStr < state.window.from) return state.window.from;
+  if (dateStr > state.window.to) return state.window.to;
+  return dateStr;
+}
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function summarize(text, max = 20) {
+  const t = (text || '').trim();
+  if (!t) return '';
+  return t.length > max ? t.slice(0, max) + '...' : t;
+}
+
+// =========================
+// GAS Calls
+// =========================
+function gasGetMasters() {
+  return new Promise((res, rej) => {
+    google.script.run.withSuccessHandler(res).withFailureHandler(rej).getMasters();
+  });
+}
+
+function gasGetWindow() {
+  return new Promise((res, rej) => {
+    google.script.run.withSuccessHandler(res).withFailureHandler(rej).getWindowBase();
+  });
+}
+
+function gasListReservations(from, to, room) {
+  return new Promise((res, rej) => {
+    google.script.run.withSuccessHandler(res).withFailureHandler(rej).listReservations(from, to, room || '');
+  });
+}
+
+function gasCreateReservation(payload) {
+  return new Promise((res, rej) => {
+    google.script.run.withSuccessHandler(res).withFailureHandler(rej).createReservation(payload);
+  });
+}
+
+// =========================
+// Initialization
+// =========================
+async function init() {
+  try {
+    const [masters, win] = await Promise.all([gasGetMasters(), gasGetWindow()]);
+    state.masters = masters;
+    state.window = win;
+    state.selectedDate = win.today;
+
+    // Room colors
+    const palette = ['#FDE68A', '#BBF7D0', '#BFDBFE', '#FBCFE8', '#DDD6FE', '#FED7AA'];
+    state.masters.rooms.forEach((r, i) => {
+      state.roomColors[r] = palette[i % palette.length];
+    });
+
+    // Build week days (7 days from today)
+    state.weekDays = [];
+    for (let i = 0; i < 7; i++) {
+      state.weekDays.push(addDays(win.today, i));
+    }
+
+    buildFormOptions();
+    buildLegend();
+
+    // Load week data for counts
+    await loadWeekData();
+
+    // Initial render
+    await loadDayAndRender(state.selectedDate);
+
+    toast('初期化完了');
+  } catch (e) {
+    console.error(e);
+    toast('初期化エラー: ' + (e.message || e));
+  }
+}
+
+// =========================
+// Week Data & Tabs
+// =========================
+async function loadWeekData() {
+  const from = state.weekDays[0];
+  const to = state.weekDays[state.weekDays.length - 1];
+  const all = await gasListReservations(from, to, '');
+
+  // Count per date
+  state.weekCounts = {};
+  state.weekDays.forEach(d => state.weekCounts[d] = 0);
+  all.forEach(r => {
+    if (state.weekCounts[r.date] !== undefined) {
+      state.weekCounts[r.date]++;
+    }
+    // Cache reservations
+    if (!state.reservationsByDate[r.date]) state.reservationsByDate[r.date] = [];
+    const exists = state.reservationsByDate[r.date].find(x => x.reservationId === r.reservationId);
+    if (!exists) state.reservationsByDate[r.date].push(r);
+  });
+
+  renderWeekTabs();
+}
+
+function renderWeekTabs() {
+  const container = document.getElementById('weekTabs');
+  container.innerHTML = '';
+
+  state.weekDays.forEach(d => {
+    const tab = document.createElement('div');
+    tab.className = 'week-tab' + (d === state.selectedDate ? ' active' : '');
+    tab.onclick = () => selectDate(d);
+
+    const dateLabel = formatDateShort(d) + '(' + getDayOfWeek(d) + ')';
+    const count = state.weekCounts[d] || 0;
+
+    tab.innerHTML = `
+      <div class="date">${dateLabel}</div>
+      <div class="count">${count}件</div>
+    `;
+    container.appendChild(tab);
+  });
+}
+
+function selectDate(dateStr) {
+  state.selectedDate = clampWindow(dateStr);
+  loadDayAndRender(state.selectedDate);
+  renderWeekTabs();
+}
+
+// =========================
+// Day Loading & Rendering
+// =========================
+async function loadDayAndRender(dateStr) {
+  state.selectedDate = dateStr;
+
+  // Check cache or fetch
+  if (!state.reservationsByDate[dateStr]) {
+    const list = await gasListReservations(dateStr, dateStr, '');
+    state.reservationsByDate[dateStr] = list;
+  }
+
+  renderDayTitle();
+  renderDayGrid();
+}
+
+function renderDayTitle() {
+  const d = state.selectedDate;
+  const dow = getDayOfWeek(d);
+  document.getElementById('dayTitle').textContent = `${d} (${dow})`;
+}
+
+function renderDayGrid() {
+  const grid = document.getElementById('dayGrid');
+  const rooms = state.masters.rooms;
+  const slots = state.masters.slots;
+  const reservations = state.reservationsByDate[state.selectedDate] || [];
+
+  // Set CSS variable for room count
+  grid.style.setProperty('--room-count', rooms.length);
+
+  // Build time index map: "09:00" -> 0, "09:30" -> 1, etc.
+  const timeIndex = {};
+  slots.forEach((s, i) => timeIndex[s.start] = i);
+
+  // Build reservation map: room -> array of {startIdx, endIdx, reservation}
+  const resMap = {};
+  rooms.forEach(r => resMap[r] = []);
+
+  reservations.forEach(r => {
+    const startIdx = timeIndex[r.startTime];
+    const endIdx = timeIndex[r.endTime];
+    if (startIdx === undefined) return;
+    const actualEnd = endIdx !== undefined ? endIdx : slots.length;
+    resMap[r.room]?.push({
+      startIdx,
+      endIdx: actualEnd,
+      res: r
+    });
+  });
+
+  // Clear and rebuild grid
+  grid.innerHTML = '';
+
+  // Header row
+  const headerRow = document.createElement('div');
+  headerRow.className = 'grid-row';
+  headerRow.style.display = 'contents';
+
+  const timeHeader = document.createElement('div');
+  timeHeader.className = 'grid-cell grid-header';
+  timeHeader.textContent = 'Time';
+  headerRow.appendChild(timeHeader);
+
+  rooms.forEach(room => {
+    const roomHeader = document.createElement('div');
+    roomHeader.className = 'grid-cell grid-header';
+    roomHeader.textContent = room;
+    headerRow.appendChild(roomHeader);
+  });
+  grid.appendChild(headerRow);
+
+  // Time rows
+  slots.forEach((slot, rowIdx) => {
+    const row = document.createElement('div');
+    row.className = 'grid-row';
+    row.style.display = 'contents';
+
+    // Time cell
+    const timeCell = document.createElement('div');
+    timeCell.className = 'grid-cell time-cell' + (rowIdx % 2 === 1 ? ' half' : '');
+    timeCell.textContent = slot.start;
+    row.appendChild(timeCell);
+
+    // Room cells
+    rooms.forEach(room => {
+      const cell = document.createElement('div');
+      cell.className = 'grid-cell';
+      cell.dataset.room = room;
+      cell.dataset.time = slot.start;
+      cell.dataset.rowIdx = rowIdx;
+
+      // Check if this cell has a reservation
+      const resInfo = resMap[room]?.find(ri => rowIdx >= ri.startIdx && rowIdx < ri.endIdx);
+
+      if (resInfo) {
+        const color = state.roomColors[room] || '#E5E7EB';
+        cell.style.background = color;
+        cell.className += ' res-cell';
+
+        if (rowIdx === resInfo.startIdx) {
+          // Start cell: show content
+          const r = resInfo.res;
+          cell.innerHTML = `
+            <div class="res-content">
+              <div class="res-name">${escapeHtml(r.name)}</div>
+              <div class="res-time">${escapeHtml(r.startTime)}-${escapeHtml(r.endTime)}</div>
+              ${r.customerName ? `<div class="res-customer">${escapeHtml(summarize(r.customerName, 15))}</div>` : ''}
+              ${r.meetingDetail ? `<div class="res-detail">${escapeHtml(summarize(r.meetingDetail, 20))}</div>` : ''}
+            </div>
+          `;
+          cell.onclick = () => showDetailModal(r);
+        } else {
+          // Continuation cell: just color
+          cell.className += ' continuation';
+          cell.onclick = () => showDetailModal(resInfo.res);
+        }
+      } else {
+        // Empty cell
+        cell.className += ' empty-cell' + (rowIdx % 2 === 1 ? ' half' : '');
+        cell.onclick = () => openFormModal(room, slot.start);
+      }
+
+      row.appendChild(cell);
+    });
+
+    grid.appendChild(row);
+  });
+}
+
+// =========================
+// Form Modal
+// =========================
+function buildFormOptions() {
+  // Names
+  const nameSel = document.getElementById('fName');
+  nameSel.innerHTML = '';
+  state.masters.names.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = n;
+    nameSel.appendChild(opt);
+  });
+
+  // Rooms
+  const roomSel = document.getElementById('fRoom');
+  roomSel.innerHTML = '';
+  state.masters.rooms.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r;
+    opt.textContent = r;
+    roomSel.appendChild(opt);
+  });
+
+  // Times
+  const startSel = document.getElementById('fStart');
+  const endSel = document.getElementById('fEnd');
+  startSel.innerHTML = '';
+  endSel.innerHTML = '';
+
+  state.masters.slots.forEach(s => {
+    const optS = document.createElement('option');
+    optS.value = s.start;
+    optS.textContent = s.start;
+    startSel.appendChild(optS);
+
+    const optE = document.createElement('option');
+    optE.value = s.end;
+    optE.textContent = s.end;
+    endSel.appendChild(optE);
+  });
+}
+
+function openFormModal(room, startTime) {
+  document.getElementById('fDate').value = state.selectedDate;
+  document.getElementById('fRoom').value = room;
+  document.getElementById('fStart').value = startTime;
+
+  // End = start + 30min (next slot)
+  const idx = state.masters.slots.findIndex(s => s.start === startTime);
+  if (idx >= 0 && idx < state.masters.slots.length) {
+    document.getElementById('fEnd').value = state.masters.slots[idx].end;
+  }
+
+  document.getElementById('fCustomer').value = '';
+  document.getElementById('fDetail').value = '';
+  document.getElementById('formHint').textContent = '';
+
+  document.getElementById('formModal').classList.add('show');
+}
+
+function closeFormModal() {
+  document.getElementById('formModal').classList.remove('show');
+}
+
+async function submitReservation() {
+  const btn = document.getElementById('btnSubmit');
+  const hint = document.getElementById('formHint');
+  hint.textContent = '';
+
+  const payload = {
+    date: document.getElementById('fDate').value,
+    startTime: document.getElementById('fStart').value,
+    endTime: document.getElementById('fEnd').value,
+    room: document.getElementById('fRoom').value,
+    name: document.getElementById('fName').value,
+    customerName: document.getElementById('fCustomer').value,
+    meetingDetail: document.getElementById('fDetail').value
   };
 
-  // =========================
-  // Utils
-  // =========================
-  function toast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(()=>t.classList.remove('show'), 2800);
-  }
+  btn.disabled = true;
+  btn.textContent = '登録中...';
 
-  function ymd(dateObj){
-    const y = dateObj.getFullYear();
-    const m = String(dateObj.getMonth()+1).padStart(2,'0');
-    const d = String(dateObj.getDate()).padStart(2,'0');
-    return `${y}-${m}-${d}`;
-  }
-
-  function addDays(dateStr, n){
-    const d = new Date(dateStr + 'T00:00:00');
-    d.setDate(d.getDate()+n);
-    return ymd(d);
-  }
-
-  function clampWindow(dateStr){
-    if (dateStr < state.window.from) return state.window.from;
-    if (dateStr > state.window.to) return state.window.to;
-    return dateStr;
-  }
-
-  function summarizeDetail(detail, max=28){
-    const t = (detail || '').trim();
-    if (!t) return '';
-    return t.length > max ? (t.slice(0,max) + '…') : t;
-  }
-
-  // =========================
-  // View switching (SPA)
-  // =========================
-  function showView(view){
-    const day = document.getElementById('viewDay');
-    const w2 = document.getElementById('view2w');
-    const tDay = document.getElementById('tabDay');
-    const t2 = document.getElementById('tab2w');
-
-    if (view === 'day'){
-      day.style.display = '';
-      w2.style.display = 'none';
-      tDay.classList.add('active');
-      t2.classList.remove('active');
-    } else {
-      day.style.display = 'none';
-      w2.style.display = '';
-      tDay.classList.remove('active');
-      t2.classList.add('active');
-      render2WeeksGrid(); // always fresh
+  try {
+    const res = await gasCreateReservation(payload);
+    if (!res.ok) {
+      hint.textContent = res.message || '登録に失敗しました';
+      toast(res.message || '登録失敗');
+      return;
     }
-  }
 
-  // =========================
-  // GAS calls
-  // =========================
-  function gasGetMasters(){
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        .getMasters();
-    });
-  }
+    toast('予約を登録しました');
+    closeFormModal();
 
-  function gasGetWindow(){
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        .getWindowBase();
-    });
-  }
+    // Clear cache and reload
+    delete state.reservationsByDate[payload.date];
+    await loadDayAndRender(payload.date);
 
-  function gasListReservations(fromDate, toDate, room){
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        .listReservations(fromDate, toDate, room || '');
-    });
-  }
-
-  function gasCreateReservation(payload){
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        .createReservation(payload);
-    });
-  }
-
-  // =========================
-  // Initialization
-  // =========================
-  async function init(){
-    try{
-      const [masters, win] = await Promise.all([gasGetMasters(), gasGetWindow()]);
-      state.masters = masters;
-      state.window = win;
-      state.selectedDate = win.today;
-
-      // Form defaults
-      document.getElementById('fDate').value = state.selectedDate;
-
-      buildFormOptions();
-      buildDayTableSkeleton();
-
-      await refreshDataAndRender(state.selectedDate);
-      render2WeeksGrid();
-      toast('初期化完了');
-    }catch(e){
-      console.error(e);
-      toast('初期化に失敗しました：' + (e.message || e));
-      document.getElementById('formHint').textContent = String(e.message || e);
+    // Update week counts
+    if (state.weekCounts[payload.date] !== undefined) {
+      state.weekCounts[payload.date]++;
+      renderWeekTabs();
     }
+  } catch (e) {
+    console.error(e);
+    hint.textContent = String(e.message || e);
+    toast('エラー: ' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '予約する';
   }
+}
 
-  // =========================
-  // Build UI
-  // =========================
-  function buildFormOptions(){
-    // Names
-    const nameSel = document.getElementById('fName');
-    nameSel.innerHTML = '';
-    state.masters.names.forEach(n => {
-      const opt = document.createElement('option');
-      opt.value = n; opt.textContent = n;
-      nameSel.appendChild(opt);
-    });
+// =========================
+// Detail Modal
+// =========================
+function showDetailModal(r) {
+  const body = document.getElementById('detailBody');
+  body.innerHTML = `
+    <div class="detail-grid">
+      <div class="label">日付</div>
+      <div class="value">${escapeHtml(r.date)}</div>
+      <div class="label">時間</div>
+      <div class="value">${escapeHtml(r.startTime)} - ${escapeHtml(r.endTime)}</div>
+      <div class="label">会議室</div>
+      <div class="value">${escapeHtml(r.room)}</div>
+      <div class="label">作業者</div>
+      <div class="value">${escapeHtml(r.name)}</div>
+      <div class="label">お客様名</div>
+      <div class="value">${escapeHtml(r.customerName || '—')}</div>
+      <div class="label">打合せ内容</div>
+      <div class="value">${escapeHtml(r.meetingDetail || '—')}</div>
+    </div>
+  `;
+  document.getElementById('detailModal').classList.add('show');
+}
 
-    // Rooms
-    const roomSel = document.getElementById('fRoom');
-    roomSel.innerHTML = '';
-    state.masters.rooms.forEach(r => {
-      const opt = document.createElement('option');
-      opt.value = r; opt.textContent = r;
-      roomSel.appendChild(opt);
-    });
+function closeDetailModal() {
+  document.getElementById('detailModal').classList.remove('show');
+}
 
-    // Slots
-    const startSel = document.getElementById('fStart');
-    const endSel = document.getElementById('fEnd');
-    startSel.innerHTML = '';
-    endSel.innerHTML = '';
+// =========================
+// Legend
+// =========================
+function buildLegend() {
+  const container = document.getElementById('legend');
+  container.innerHTML = '';
+  state.masters.rooms.forEach(room => {
+    const color = state.roomColors[room];
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<span class="legend-dot" style="background:${color}"></span>${escapeHtml(room)}`;
+    container.appendChild(item);
+  });
+}
 
-    const starts = state.masters.slots.map(s => s.start);
-    const ends = state.masters.slots.map(s => s.end);
+// =========================
+// Navigation
+// =========================
+function shiftDay(delta) {
+  const next = clampWindow(addDays(state.selectedDate, delta));
+  selectDate(next);
+}
 
-    starts.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t; opt.textContent = t;
-      startSel.appendChild(opt);
-    });
-    ends.forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t; opt.textContent = t;
-      endSel.appendChild(opt);
-    });
+function goToday() {
+  selectDate(state.window.today);
+}
 
-    // default start/end
-    startSel.value = '09:00';
-    endSel.value = '10:00';
-
-    // date change sync
-    document.getElementById('fDate').addEventListener('change', (e)=>{
-      const d = clampWindow(e.target.value);
-      state.selectedDate = d;
-      syncDayLabel();
-      refreshDataAndRender(d);
-    });
-  }
-
-  function buildDayTableSkeleton(){
-    // Header (rooms)
-    const head = document.getElementById('dayHeadRow');
-    // remove old room ths (keep first)
-    while(head.children.length > 1) head.removeChild(head.lastChild);
-
-    state.masters.rooms.forEach(r=>{
-      const th = document.createElement('th');
-      th.textContent = r;
-      head.appendChild(th);
-    });
-
-    // Body (time slots)
-    const body = document.getElementById('dayBody');
-    body.innerHTML = '';
-
-    // Use masters.slots for time rows (Start times)
-    const times = state.masters.slots.map(s=>s.start);
-    times.forEach((t, idx)=>{
-      const tr = document.createElement('tr');
-      const tdTime = document.createElement('td');
-      tdTime.className = 'timeCell ' + ((idx%2===1) ? 'halfHour' : '');
-      tdTime.textContent = t;
-      tr.appendChild(tdTime);
-
-      state.masters.rooms.forEach((r)=>{
-        const td = document.createElement('td');
-        td.dataset.time = t;
-        td.dataset.room = r;
-        td.className = ((idx%2===1) ? 'halfHour' : '');
-        tr.appendChild(td);
-      });
-
-      body.appendChild(tr);
-    });
-
-    // legend
-    renderLegend();
-  }
-
-  function renderLegend(){
-    const legend = document.getElementById('roomLegend');
-    legend.innerHTML = '';
-    // Web側の色は仮（GAS側色と一致させたい場合は、rooms->colorをAPIで返す拡張が良い）
-    const palette = ['#FDE68A','#BBF7D0','#BFDBFE','#FBCFE8','#DDD6FE','#FED7AA'];
-    state.masters.rooms.forEach((r, i)=>{
-      const color = palette[i % palette.length];
-      state.roomColors[r] = color;
-
-      const sw = document.createElement('div');
-      sw.className = 'swatch';
-      sw.innerHTML = `<span class="dot" style="background:${color}"></span>${r}`;
-      legend.appendChild(sw);
-    });
-  }
-
-  // =========================
-  // Data + render
-  // =========================
-  async function refreshDataAndRender(dateStr){
-    state.selectedDate = clampWindow(dateStr);
-    syncDayLabel();
-    document.getElementById('fDate').value = state.selectedDate;
-
-    // list only selected day
-    const list = await gasListReservations(state.selectedDate, state.selectedDate, '');
-    state.reservationsByDate[state.selectedDate] = list;
-
-    renderDay(dateStr);
-  }
-
-  function syncDayLabel(){
-    document.getElementById('dayLabel').textContent = state.selectedDate;
-    document.getElementById('dayDateText').textContent = state.selectedDate;
-    document.getElementById('baseLabel').textContent = state.window.today;
-  }
-
-  function clearDayCells(){
-    const body = document.getElementById('dayBody');
-    [...body.querySelectorAll('td[data-room]')].forEach(td=>{
-      td.innerHTML = '';
-    });
-  }
-
-  function renderDay(dateStr){
-    clearDayCells();
-
-    const list = state.reservationsByDate[dateStr] || [];
-    // Sort by start
-    list.sort((a,b)=>(a.startTime.localeCompare(b.startTime)));
-
-    // Place "blocks" by putting a div in the start cell; for MVP we won't row-span
-    // (Later: implement row-span-like rendering if needed)
-    list.forEach(r=>{
-      const td = document.querySelector(`td[data-room="${cssEscape(r.room)}"][data-time="${cssEscape(r.startTime)}"]`);
-      if (!td) return;
-
-      const color = state.roomColors[r.room] || '#E5E7EB';
-      const customer = (r.customerName || '').trim();
-      const detail = (r.meetingDetail || '').trim();
-      const detailShort = summarizeDetail(detail, 28);
-
-      const div = document.createElement('div');
-      div.className = 'slot slotClickable';
-      div.style.background = color;
-      div.innerHTML = `
-        <div class="name">${escapeHtml(r.name || '')}</div>
-        <div class="time">${escapeHtml(r.startTime)}-${escapeHtml(r.endTime)}</div>
-        ${customer ? `<div class="customer">${escapeHtml(customer)}</div>` : ''}
-        ${detailShort ? `<div class="detail">${escapeHtml(detailShort)}</div>` : `<div class="detail muted"></div>`}
-      `;
-      div.onclick = ()=>showReservationModal(r);
-      td.appendChild(div);
-    });
-  }
-
-  // =========================
-  // 2 weeks grid
-  // =========================
-  function render2WeeksGrid(){
-    const grid = document.getElementById('weeksGrid');
-    grid.innerHTML = '';
-
-    const days = [];
-    for(let i=0;i<14;i++) days.push(addDays(state.window.today, i));
-
-    // We'll compute counts client-side by fetching all 14 days once when opening 2w
-    // For speed, cache by (today)
-    gasListReservations(state.window.from, state.window.to, '')
-      .then(all=>{
-        // counts[date][room]
-        const counts = {};
-        days.forEach(d=>{
-          counts[d] = {};
-          state.masters.rooms.forEach(r=>counts[d][r]=0);
-        });
-        all.forEach(r=>{
-          if (!counts[r.date]) return;
-          if (counts[r.date][r.room] === undefined) return;
-          counts[r.date][r.room] += 1;
-        });
-
-        days.forEach(d=>{
-          const card = document.createElement('div');
-          card.className = 'dayCard';
-          card.onclick = ()=>{
-            showView('day');
-            refreshDataAndRender(d);
-          };
-
-          const top = document.createElement('div');
-          top.innerHTML = `<div class="d">${d}</div><div class="sub">クリックでDAYへ</div>`;
-          card.appendChild(top);
-
-          const list = document.createElement('div');
-          list.className = 'countList';
-          state.masters.rooms.forEach(room=>{
-            const row = document.createElement('div');
-            row.className = 'countRow';
-            row.innerHTML = `<span>${escapeHtml(room)}</span><span>${counts[d][room]}件</span>`;
-            list.appendChild(row);
-          });
-          card.appendChild(list);
-          grid.appendChild(card);
-        });
-      })
-      .catch(e=>{
-        console.error(e);
-        toast('2週間データ取得に失敗：' + (e.message || e));
-      });
-  }
-
-  // =========================
-  // Navigation (day)
-  // =========================
-  function shiftDay(delta){
-    const next = clampWindow(addDays(state.selectedDate, delta));
-    refreshDataAndRender(next);
-  }
-
-  function goToday(){
-    showView('day');
-    refreshDataAndRender(state.window.today);
-  }
-
-  // =========================
-  // Submit
-  // =========================
-  async function submitReservation(){
-    const btn = document.getElementById('btnCreate');
-    const hint = document.getElementById('formHint');
-    hint.textContent = '';
-
-    const payload = {
-      date: clampWindow(document.getElementById('fDate').value),
-      startTime: document.getElementById('fStart').value,
-      endTime: document.getElementById('fEnd').value,
-      room: document.getElementById('fRoom').value,
-      name: document.getElementById('fName').value,
-      customerName: document.getElementById('fCustomer').value,
-      meetingDetail: document.getElementById('fDetail').value,
-    };
-
-    btn.disabled = true;
-    btn.textContent = '登録中...';
-
-    try{
-      const res = await gasCreateReservation(payload);
-      if (!res.ok){
-        toast(res.message || '登録に失敗');
-        hint.textContent = res.message || '登録に失敗';
-        return;
-      }
-      toast('予約を登録しました');
-      // clear optional fields
-      document.getElementById('fCustomer').value = '';
-      document.getElementById('fDetail').value = '';
-
-      // refresh day + 2weeks cache
-      await refreshDataAndRender(payload.date);
-      if (document.getElementById('view2w').style.display !== 'none'){
-        render2WeeksGrid();
-      }
-    }catch(e){
-      console.error(e);
-      toast('エラー：' + (e.message || e));
-      hint.textContent = String(e.message || e);
-    }finally{
-      btn.disabled = false;
-      btn.textContent = '予約する';
-    }
-  }
-
-  // =========================
-  // Modal
-  // =========================
-  function showReservationModal(r){
-    document.getElementById('mTitle').textContent = '予約詳細';
-    const body = document.getElementById('modalBody');
-    body.innerHTML = `
-      <div class="kv">
-        <div>日付</div><div>${escapeHtml(r.date)}</div>
-        <div>時間</div><div>${escapeHtml(r.startTime)}-${escapeHtml(r.endTime)}</div>
-        <div>会議室</div><div>${escapeHtml(r.room)}</div>
-        <div>作業者</div><div>${escapeHtml(r.name)}</div>
-        <div>お客様名</div><div>${escapeHtml((r.customerName||'').trim() || '—')}</div>
-        <div>打合せ内容</div><div>${escapeHtml((r.meetingDetail||'').trim() || '—')}</div>
-      </div>
-    `;
-    document.getElementById('modalBack').classList.add('show');
-  }
-
-  function hideModal(){
-    document.getElementById('modalBack').classList.remove('show');
-  }
-
-  function closeModal(e){
-    if (e.target.id === 'modalBack') hideModal();
-  }
-
-  // =========================
-  // Safety helpers
-  // =========================
-  function escapeHtml(s){
-    return String(s ?? '')
-      .replaceAll('&','&amp;')
-      .replaceAll('<','&lt;')
-      .replaceAll('>','&gt;')
-      .replaceAll('"','&quot;')
-      .replaceAll("'","&#39;");
-  }
-  function cssEscape(s){
-    // minimal escape for attribute selector
-    return String(s ?? '').replaceAll('"','\\"');
-  }
-
-  // Start
-  window.addEventListener('load', init);
+// =========================
+// Start
+// =========================
+window.addEventListener('load', init);
 </script>
 
 </body>
