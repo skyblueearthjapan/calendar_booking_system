@@ -135,6 +135,24 @@ function buildTimeSlots_() {
   return slots;
 }
 
+/** テスト用：手動でDAYビューと2週間ビューを更新 */
+function testRender() {
+  const today = getWindowBase_().today;
+  console.log('Today:', today);
+
+  // 予約データの確認
+  const reservations = listReservations(today, today);
+  console.log('Reservations for today:', JSON.stringify(reservations, null, 2));
+
+  // DAYビューの更新
+  renderDay(today);
+  console.log('renderDay completed');
+
+  // 2週間ビューの更新
+  render2Weeks(today);
+  console.log('render2Weeks completed');
+}
+
 /** 時間を HH:mm 形式に正規化（9:00 → 09:00） */
 function normalizeTime_(timeStr) {
   if (!timeStr) return '';

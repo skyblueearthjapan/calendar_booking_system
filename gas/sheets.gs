@@ -94,11 +94,41 @@ function rowToReservation_(r, map) {
     const colIndex = map[headerName];
     return colIndex ? r[colIndex - 1] : '';
   };
+
+  // 日付をフォーマット（Dateオブジェクトの場合に対応）
+  const formatDateValue = (val) => {
+    if (!val) return '';
+    if (val instanceof Date) {
+      return Utilities.formatDate(val, CFG.TZ, 'yyyy-MM-dd');
+    }
+    return String(val).trim();
+  };
+
+  // 時間をフォーマット（Dateオブジェクトの場合に対応）
+  const formatTimeValue = (val) => {
+    if (!val) return '';
+    if (val instanceof Date) {
+      return Utilities.formatDate(val, CFG.TZ, 'HH:mm');
+    }
+    // 文字列の場合、正規化（9:00 → 09:00）
+    const t = String(val).trim();
+    if (/^\d{1}:\d{2}$/.test(t)) return '0' + t;
+    if (/^\d{2}:\d{2}$/.test(t)) return t;
+    // その他の形式
+    const parts = t.split(':');
+    if (parts.length === 2) {
+      const h = String(parts[0]).padStart(2, '0');
+      const m = String(parts[1]).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+    return t;
+  };
+
   return {
     reservationId: String(get(H.reservationId) || '').trim(),
-    date: String(get(H.date) || '').trim(),
-    startTime: String(get(H.startTime) || '').trim(),
-    endTime: String(get(H.endTime) || '').trim(),
+    date: formatDateValue(get(H.date)),
+    startTime: formatTimeValue(get(H.startTime)),
+    endTime: formatTimeValue(get(H.endTime)),
     room: String(get(H.room) || '').trim(),
     name: String(get(H.name) || '').trim(),
     customerName: String(get(H.customerName) || '').trim(),
