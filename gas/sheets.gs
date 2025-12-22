@@ -87,7 +87,9 @@ function readAllReservations_() {
   if (lastRow <= 2) return { map, rows: [] };
 
   const lastCol = sh.getLastColumn();
-  const values = sh.getRange(3, 1, lastRow - 2, lastCol).getValues();
+  // getDisplayValues() を使用して、セルに表示されている値をそのまま文字列として取得
+  // これによりDateオブジェクトのタイムゾーン変換問題を回避
+  const values = sh.getRange(3, 1, lastRow - 2, lastCol).getDisplayValues();
 
   const rows = values
     .filter(r => r.some(v => v !== '' && v !== null))
