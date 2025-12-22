@@ -1,5 +1,14 @@
 /** sheets.gs */
 
+/** デバッグ用：どのスプレッドシートを開いているか確認 */
+function debugSpreadsheetTarget() {
+  const ss = _ss();
+  console.log('CFG.SPREADSHEET_ID=', CFG.SPREADSHEET_ID);
+  console.log('OPENED ssId=', ss.getId());
+  console.log('OPENED ssName=', ss.getName());
+  console.log('Sheets=', ss.getSheets().map(s => s.getName()).join(', '));
+}
+
 function _ss() {
   // スクリプトプロパティにSPREADSHEET_IDが設定されている場合はそれを使用
   // 設定されていない場合はgetActiveSpreadsheet()にフォールバック
