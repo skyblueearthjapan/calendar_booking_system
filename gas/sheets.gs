@@ -117,7 +117,10 @@ function rowToReservation_(r, map) {
   const formatTimeValue = (val) => {
     if (!val) return '';
     if (val instanceof Date) {
-      return Utilities.formatDate(val, CFG.TZ, 'HH:mm');
+      // Dateオブジェクトから直接時間を取得（タイムゾーン変換の問題を回避）
+      const h = String(val.getHours()).padStart(2, '0');
+      const m = String(val.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
     }
     // 文字列の場合、正規化（9:00 → 09:00）
     const t = String(val).trim();
