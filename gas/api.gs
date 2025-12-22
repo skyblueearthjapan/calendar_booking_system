@@ -60,8 +60,9 @@ function createReservation(payload) {
       renderDay(p.date);
       render2Weeks(getWindowBase_().today);
     } catch (e) {
-      // 表示更新失敗でも予約自体は成功扱い（ログだけ）
-      console.error(e);
+      // デバッグ用：エラーを表面化させる
+      console.error('render failed:', e);
+      throw e; // 一時的に握りつぶさずエラーを返す
     }
 
     return { ok: true, reservationId };
