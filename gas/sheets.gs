@@ -63,11 +63,26 @@ function readColumn_(sh, startRow, col) {
 function readSlots_(sh, startRow, colStart, colEnd) {
   const lastRow = sh.getLastRow();
   if (lastRow < startRow) return [];
-  const rows = sh.getRange(startRow, colStart, lastRow - startRow + 1, colEnd - colStart + 1).getValues();
+  // getDisplayValues() を使用して、タイムゾーン変換問題を回避
+  const rows = sh.getRange(startRow, colStart, lastRow - startRow + 1, colEnd - colStart + 1).getDisplayValues();
   const slots = [];
   rows.forEach(r => {
-    const s = String(r[0] || '').trim();
-    const e = String(r[1] || '').trim();
+    // 時間を HH:mm 形式に正規化
+    const normalizeTime = (t) => {
+      const str = String(t || '').trim();
+      if (!str) return '';
+      // H:mm → HH:mm
+      if (/^\d{1}:\d{2}$/.test(str)) return '0' + str;
+      if (/^\d{2}:\d{2}$/.test(str)) return str;
+      // その他のフォーマット
+      const parts = str.split(':');
+      if (parts.length === 2) {
+        return String(parts[0]).padStart(2, '0') + ':' + String(parts[1]).padStart(2, '0');
+      }
+      return str;
+    };
+    const s = normalizeTime(r[0]);
+    const e = normalizeTime(r[1]);
     if (s && e) slots.push({ start: s, end: e });
   });
   return slots;
