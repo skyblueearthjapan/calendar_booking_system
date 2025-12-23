@@ -436,6 +436,93 @@
       .week-tab .date{font-size:11px}
       .day-grid{grid-template-columns:60px repeat(var(--room-count), minmax(100px, 1fr))}
     }
+
+    /* Welcome Board Styles */
+    .welcome-overlay{
+      position:fixed;
+      inset:0;
+      background:linear-gradient(180deg, #0B3A66 0%, #1E5A8A 100%);
+      display:none;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      z-index:500;
+      color:#fff;
+      text-align:center;
+      padding:40px;
+    }
+    .welcome-overlay.show{display:flex}
+    .welcome-close{
+      position:absolute;
+      top:20px;
+      right:20px;
+      background:rgba(255,255,255,.15);
+      border:1px solid rgba(255,255,255,.3);
+      color:#fff;
+      width:50px;
+      height:50px;
+      border-radius:12px;
+      font-size:24px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition:.2s;
+    }
+    .welcome-close:hover{background:rgba(255,255,255,.25)}
+    .welcome-room{
+      font-size:clamp(48px, 10vw, 96px);
+      font-weight:900;
+      margin-bottom:20px;
+      text-shadow:0 4px 20px rgba(0,0,0,.3);
+    }
+    .welcome-company{
+      font-size:clamp(24px, 5vw, 42px);
+      font-weight:700;
+      margin-bottom:8px;
+      opacity:.95;
+    }
+    .welcome-subtitle{
+      font-size:clamp(16px, 3vw, 24px);
+      font-weight:600;
+      opacity:.8;
+      margin-bottom:50px;
+      letter-spacing:.15em;
+    }
+    .welcome-customer{
+      font-size:clamp(36px, 7vw, 64px);
+      font-weight:900;
+      margin-bottom:30px;
+    }
+    .welcome-message{
+      font-size:clamp(24px, 5vw, 42px);
+      font-weight:700;
+      line-height:1.6;
+    }
+    .welcome-time{
+      position:absolute;
+      bottom:30px;
+      right:40px;
+      font-size:18px;
+      opacity:.7;
+    }
+    .welcome-waiting{
+      font-size:clamp(20px, 4vw, 32px);
+      opacity:.8;
+      margin-top:40px;
+    }
+    .btn-welcome{
+      background:#10B981;
+      color:#fff;
+      border:none;
+      padding:10px 16px;
+      border-radius:8px;
+      font-weight:700;
+      cursor:pointer;
+      transition:.15s;
+      margin-right:8px;
+    }
+    .btn-welcome:hover{background:#059669}
   </style>
 </head>
 <body>
@@ -546,6 +633,23 @@
       <button class="confirm-ok" id="confirmDeleteBtn" onclick="executeDelete()">削除する</button>
     </div>
   </div>
+</div>
+
+<!-- Welcome Board (Full Screen) -->
+<div class="welcome-overlay" id="welcomeBoard">
+  <button class="welcome-close" onclick="closeWelcomeBoard()">&times;</button>
+  <div class="welcome-room" id="welcomeRoom">第一会議室</div>
+  <div class="welcome-company">株式会社LINE WORKS</div>
+  <div class="welcome-subtitle">WELCOME BOARD</div>
+  <div class="welcome-customer" id="welcomeCustomer">○○会社 ○○様</div>
+  <div class="welcome-message">
+    ご来社ありがとうございます。<br>
+    お待ちしておりました。どうぞお入りください。
+  </div>
+  <div class="welcome-waiting" id="welcomeWaiting" style="display:none">
+    次のご予約をお待ちしています...
+  </div>
+  <div class="welcome-time" id="welcomeTime">--:--</div>
 </div>
 
 <script>
@@ -1078,6 +1182,7 @@ function renderDetailModal() {
         <div class="value">${escapeHtml(r.meetingDetail || '—')}</div>
       </div>
       <div class="detail-actions">
+        <button class="btn-welcome" onclick="showWelcomeBoard()">ウェルカム表示</button>
         <button class="btn-edit" onclick="startEdit()">編集する</button>
         <button class="btn-delete" onclick="confirmDelete()">削除</button>
       </div>
@@ -1222,6 +1327,61 @@ function shiftDay(delta) {
 
 function goToday() {
   selectDate(state.window.today);
+}
+
+// =========================
+// Welcome Board
+// =========================
+let welcomeTimeInterval = null;
+
+function showWelcomeBoard() {
+  const r = state.editingReservation;
+  if (!r) return;
+
+  // Set welcome board content
+  document.getElementById('welcomeRoom').textContent = r.room;
+  document.getElementById('welcomeCustomer').textContent = r.customerName || '様';
+
+  // Show/hide waiting message
+  const waitingEl = document.getElementById('welcomeWaiting');
+  const customerEl = document.getElementById('welcomeCustomer');
+  const messageEl = document.querySelector('.welcome-message');
+
+  if (r.customerName) {
+    customerEl.style.display = '';
+    messageEl.style.display = '';
+    waitingEl.style.display = 'none';
+  } else {
+    customerEl.textContent = '';
+    messageEl.style.display = '';
+    waitingEl.style.display = 'none';
+  }
+
+  // Close detail modal
+  closeDetailModal();
+
+  // Show welcome board
+  document.getElementById('welcomeBoard').classList.add('show');
+
+  // Start time update
+  updateWelcomeTime();
+  welcomeTimeInterval = setInterval(updateWelcomeTime, 1000);
+}
+
+function closeWelcomeBoard() {
+  document.getElementById('welcomeBoard').classList.remove('show');
+  if (welcomeTimeInterval) {
+    clearInterval(welcomeTimeInterval);
+    welcomeTimeInterval = null;
+  }
+}
+
+function updateWelcomeTime() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  document.getElementById('welcomeTime').textContent = `${h}:${m}:${s}`;
 }
 
 // =========================

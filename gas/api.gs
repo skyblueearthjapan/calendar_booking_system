@@ -152,6 +152,48 @@ function deleteReservation(reservationId) {
   }
 }
 
+/** 予約IDで予約を取得（ウェルカムボード用） */
+function getReservationById(reservationId) {
+  const { rows } = readAllReservations_();
+  const target = rows.find(r => r.reservationId === reservationId && r.status === 'active');
+  return target || null;
+}
+
+/** 指定会議室の直近の予約を取得（開始30分前〜終了まで） */
+function getUpcomingReservation(room) {
+  const { rows } = readAllReservations_();
+  const now = new Date();
+  const today = Utilities.formatDate(now, CFG.TZ, 'yyyy-MM-dd');
+
+  // 今日の指定会議室の予約を取得
+  const todayReservations = rows.filter(r => {
+    if (r.status && r.status !== 'active') return false;
+    if (r.date !== today) return false;
+    if (r.room !== room) return false;
+    return true;
+  });
+
+  // 開始時間でソート
+  todayReservations.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  // 現在時刻から30分後までに開始する、または現在進行中の予約を探す
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  for (const r of todayReservations) {
+    const [startH, startM] = r.startTime.split(':').map(Number);
+    const [endH, endM] = r.endTime.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+
+    // 開始30分前 <= 現在時刻 < 終了時刻
+    if (nowMinutes >= startMinutes - 30 && nowMinutes < endMinutes) {
+      return r;
+    }
+  }
+
+  return null;
+}
+
 function normalizePayload_(payload) {
   const p = payload || {};
   return {
