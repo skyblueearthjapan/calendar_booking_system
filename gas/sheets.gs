@@ -197,3 +197,81 @@ function appendReservation_(payload) {
 
   sh.appendRow(out);
 }
+
+/** 予約を更新（reservationIdで検索して該当行を更新） */
+function updateReservation_(reservationId, payload) {
+  const sh = _sheet(CFG.SHEETS.RESERVATIONS);
+  const map = getHeaderMap_(sh, 2);
+  const H = CFG.HEADER_MAP;
+
+  const lastRow = sh.getLastRow();
+  const lastCol = sh.getLastColumn();
+  if (lastRow <= 2) throw new Error('予約が見つかりません');
+
+  // reservationId列を検索
+  const idCol = map[H.reservationId];
+  if (!idCol) throw new Error('reservationId列が見つかりません');
+
+  const ids = sh.getRange(3, idCol, lastRow - 2, 1).getValues().flat();
+  const rowIndex = ids.findIndex(id => String(id).trim() === reservationId);
+
+  if (rowIndex === -1) throw new Error('予約が見つかりません');
+
+  const actualRow = rowIndex + 3; // 3行目から開始
+
+  const now = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd HH:mm:ss');
+
+  // 更新するフィールド
+  const updates = {
+    [H.date]: payload.date,
+    [H.startTime]: payload.startTime,
+    [H.endTime]: payload.endTime,
+    [H.room]: payload.room,
+    [H.name]: payload.name,
+    [H.customerName]: payload.customerName || '',
+    [H.meetingDetail]: payload.meetingDetail || '',
+    [H.updatedAt]: now,
+  };
+
+  // 各フィールドを更新
+  for (const [header, value] of Object.entries(updates)) {
+    const col = map[header];
+    if (col) {
+      sh.getRange(actualRow, col).setValue(value);
+    }
+  }
+
+  return true;
+}
+
+/** 予約を削除（論理削除: statusを'deleted'に変更） */
+function deleteReservation_(reservationId) {
+  const sh = _sheet(CFG.SHEETS.RESERVATIONS);
+  const map = getHeaderMap_(sh, 2);
+  const H = CFG.HEADER_MAP;
+
+  const lastRow = sh.getLastRow();
+  if (lastRow <= 2) throw new Error('予約が見つかりません');
+
+  // reservationId列を検索
+  const idCol = map[H.reservationId];
+  if (!idCol) throw new Error('reservationId列が見つかりません');
+
+  const ids = sh.getRange(3, idCol, lastRow - 2, 1).getValues().flat();
+  const rowIndex = ids.findIndex(id => String(id).trim() === reservationId);
+
+  if (rowIndex === -1) throw new Error('予約が見つかりません');
+
+  const actualRow = rowIndex + 3;
+
+  const now = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd HH:mm:ss');
+
+  // ステータスを'deleted'に変更（論理削除）
+  const statusCol = map[H.status];
+  const updatedAtCol = map[H.updatedAt];
+
+  if (statusCol) sh.getRange(actualRow, statusCol).setValue('deleted');
+  if (updatedAtCol) sh.getRange(actualRow, updatedAtCol).setValue(now);
+
+  return true;
+}

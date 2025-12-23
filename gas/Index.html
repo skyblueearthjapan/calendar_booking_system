@@ -330,6 +330,88 @@
     .detail-grid .label{color:var(--muted);font-weight:700}
     .detail-grid .value{font-weight:600}
 
+    /* Detail Modal Buttons */
+    .detail-actions{
+      display:flex;
+      gap:8px;
+      margin-top:16px;
+      padding-top:16px;
+      border-top:1px solid var(--line);
+    }
+    .btn-edit{
+      flex:1;
+      background:var(--navy);
+      color:#fff;
+      border:none;
+      padding:10px;
+      border-radius:8px;
+      font-weight:700;
+      cursor:pointer;
+      transition:.15s;
+    }
+    .btn-edit:hover{filter:brightness(1.1)}
+    .btn-delete{
+      background:#DC2626;
+      color:#fff;
+      border:none;
+      padding:10px 16px;
+      border-radius:8px;
+      font-weight:700;
+      cursor:pointer;
+      transition:.15s;
+    }
+    .btn-delete:hover{background:#B91C1C}
+    .btn-cancel{
+      flex:1;
+      background:#fff;
+      color:var(--text);
+      border:1px solid var(--line);
+      padding:10px;
+      border-radius:8px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .btn-cancel:hover{background:var(--bg)}
+    .btn-save{
+      flex:1;
+      background:#059669;
+      color:#fff;
+      border:none;
+      padding:10px;
+      border-radius:8px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    .btn-save:hover{background:#047857}
+    .btn-save:disabled,.btn-delete:disabled{opacity:.5;cursor:not-allowed}
+
+    /* Confirm Dialog */
+    .confirm-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(17,24,39,.6);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:300;
+    }
+    .confirm-overlay.show{display:flex}
+    .confirm-box{
+      background:#fff;
+      border-radius:12px;
+      padding:20px;
+      max-width:320px;
+      text-align:center;
+      box-shadow:0 20px 50px rgba(0,0,0,.3);
+    }
+    .confirm-box p{font-weight:700;margin-bottom:16px}
+    .confirm-btns{display:flex;gap:10px}
+    .confirm-btns button{flex:1;padding:10px;border-radius:8px;font-weight:700;cursor:pointer}
+    .confirm-cancel{background:#fff;border:1px solid var(--line);color:var(--text)}
+    .confirm-cancel:hover{background:var(--bg)}
+    .confirm-ok{background:#DC2626;border:none;color:#fff}
+    .confirm-ok:hover{background:#B91C1C}
+
     /* Toast */
     .toast{
       position:fixed;
@@ -455,6 +537,17 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- Delete Confirm Dialog -->
+<div class="confirm-overlay" id="confirmDialog">
+  <div class="confirm-box">
+    <p>この予約を削除してよろしいですか？</p>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="closeConfirmDialog()">キャンセル</button>
+      <button class="confirm-ok" id="confirmDeleteBtn" onclick="executeDelete()">削除する</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // =========================
 // State
@@ -466,7 +559,9 @@ const state = {
   weekDays: [],
   reservationsByDate: {},
   roomColors: {},
-  weekCounts: {} // date -> total count
+  weekCounts: {}, // date -> total count
+  editingReservation: null, // 現在編集中の予約
+  isEditMode: false // 編集モードかどうか
 };
 
 // =========================
@@ -548,6 +643,18 @@ function gasListReservations(from, to, room) {
 function gasCreateReservation(payload) {
   return new Promise((res, rej) => {
     google.script.run.withSuccessHandler(res).withFailureHandler(rej).createReservation(payload);
+  });
+}
+
+function gasUpdateReservation(reservationId, payload) {
+  return new Promise((res, rej) => {
+    google.script.run.withSuccessHandler(res).withFailureHandler(rej).updateReservation(reservationId, payload);
+  });
+}
+
+function gasDeleteReservation(reservationId) {
+  return new Promise((res, rej) => {
+    google.script.run.withSuccessHandler(res).withFailureHandler(rej).deleteReservation(reservationId);
   });
 }
 
@@ -883,31 +990,211 @@ async function submitReservation() {
 }
 
 // =========================
-// Detail Modal
+// Detail Modal (View / Edit)
 // =========================
 function showDetailModal(r) {
-  const body = document.getElementById('detailBody');
-  body.innerHTML = `
-    <div class="detail-grid">
-      <div class="label">日付</div>
-      <div class="value">${escapeHtml(r.date)}</div>
-      <div class="label">時間</div>
-      <div class="value">${escapeHtml(r.startTime)} - ${escapeHtml(r.endTime)}</div>
-      <div class="label">会議室</div>
-      <div class="value">${escapeHtml(r.room)}</div>
-      <div class="label">作業者</div>
-      <div class="value">${escapeHtml(r.name)}</div>
-      <div class="label">お客様名</div>
-      <div class="value">${escapeHtml(r.customerName || '—')}</div>
-      <div class="label">打合せ内容</div>
-      <div class="value">${escapeHtml(r.meetingDetail || '—')}</div>
-    </div>
-  `;
+  state.editingReservation = r;
+  state.isEditMode = false;
+  renderDetailModal();
   document.getElementById('detailModal').classList.add('show');
+}
+
+function renderDetailModal() {
+  const r = state.editingReservation;
+  if (!r) return;
+
+  const body = document.getElementById('detailBody');
+
+  if (state.isEditMode) {
+    // 編集モード
+    const roomOptions = state.masters.rooms.map(room =>
+      `<option value="${escapeHtml(room)}" ${room === r.room ? 'selected' : ''}>${escapeHtml(room)}</option>`
+    ).join('');
+
+    const nameOptions = state.masters.names.map(name =>
+      `<option value="${escapeHtml(name)}" ${name === r.name ? 'selected' : ''}>${escapeHtml(name)}</option>`
+    ).join('');
+
+    const startOptions = state.masters.slots.map(s =>
+      `<option value="${s.start}" ${s.start === r.startTime ? 'selected' : ''}>${s.start}</option>`
+    ).join('');
+
+    const endOptions = state.masters.slots.map(s =>
+      `<option value="${s.end}" ${s.end === r.endTime ? 'selected' : ''}>${s.end}</option>`
+    ).join('');
+
+    body.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">日付</label>
+        <input type="date" class="form-input" id="editDate" value="${r.date}" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">開始</label>
+          <select class="form-select" id="editStart">${startOptions}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">終了</label>
+          <select class="form-select" id="editEnd">${endOptions}</select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">会議室</label>
+        <select class="form-select" id="editRoom">${roomOptions}</select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">作業者</label>
+        <select class="form-select" id="editName">${nameOptions}</select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">お客様名（任意）</label>
+        <input type="text" class="form-input" id="editCustomer" value="${escapeHtml(r.customerName || '')}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">打ち合わせ内容（任意）</label>
+        <textarea class="form-textarea" id="editDetail">${escapeHtml(r.meetingDetail || '')}</textarea>
+      </div>
+      <div class="form-hint" id="editHint"></div>
+      <div class="detail-actions">
+        <button class="btn-cancel" onclick="cancelEdit()">キャンセル</button>
+        <button class="btn-save" id="btnSave" onclick="submitUpdate()">保存する</button>
+      </div>
+    `;
+  } else {
+    // 表示モード
+    body.innerHTML = `
+      <div class="detail-grid">
+        <div class="label">日付</div>
+        <div class="value">${escapeHtml(r.date)}</div>
+        <div class="label">時間</div>
+        <div class="value">${escapeHtml(r.startTime)} - ${escapeHtml(r.endTime)}</div>
+        <div class="label">会議室</div>
+        <div class="value">${escapeHtml(r.room)}</div>
+        <div class="label">作業者</div>
+        <div class="value">${escapeHtml(r.name)}</div>
+        <div class="label">お客様名</div>
+        <div class="value">${escapeHtml(r.customerName || '—')}</div>
+        <div class="label">打合せ内容</div>
+        <div class="value">${escapeHtml(r.meetingDetail || '—')}</div>
+      </div>
+      <div class="detail-actions">
+        <button class="btn-edit" onclick="startEdit()">編集する</button>
+        <button class="btn-delete" onclick="confirmDelete()">削除</button>
+      </div>
+    `;
+  }
+}
+
+function startEdit() {
+  state.isEditMode = true;
+  renderDetailModal();
+}
+
+function cancelEdit() {
+  state.isEditMode = false;
+  renderDetailModal();
+}
+
+async function submitUpdate() {
+  const r = state.editingReservation;
+  if (!r) return;
+
+  const btn = document.getElementById('btnSave');
+  const hint = document.getElementById('editHint');
+  hint.textContent = '';
+
+  const payload = {
+    date: document.getElementById('editDate').value,
+    startTime: document.getElementById('editStart').value,
+    endTime: document.getElementById('editEnd').value,
+    room: document.getElementById('editRoom').value,
+    name: document.getElementById('editName').value,
+    customerName: document.getElementById('editCustomer').value,
+    meetingDetail: document.getElementById('editDetail').value
+  };
+
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+
+  try {
+    const res = await gasUpdateReservation(r.reservationId, payload);
+    if (!res.ok) {
+      hint.textContent = res.message || '更新に失敗しました';
+      toast(res.message || '更新失敗');
+      return;
+    }
+
+    toast('予約を更新しました');
+    closeDetailModal();
+
+    // キャッシュクリアして再読み込み
+    const oldDate = r.date;
+    delete state.reservationsByDate[oldDate];
+    delete state.reservationsByDate[payload.date];
+
+    // 週カウントも再取得
+    await loadWeekData();
+    await loadDayAndRender(state.selectedDate);
+  } catch (e) {
+    console.error(e);
+    hint.textContent = String(e.message || e);
+    toast('エラー: ' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存する';
+  }
+}
+
+function confirmDelete() {
+  document.getElementById('confirmDialog').classList.add('show');
+}
+
+function closeConfirmDialog() {
+  document.getElementById('confirmDialog').classList.remove('show');
+}
+
+async function executeDelete() {
+  const r = state.editingReservation;
+  if (!r) return;
+
+  const btn = document.getElementById('confirmDeleteBtn');
+  btn.disabled = true;
+  btn.textContent = '削除中...';
+
+  try {
+    const res = await gasDeleteReservation(r.reservationId);
+    if (!res.ok) {
+      toast(res.message || '削除に失敗しました');
+      return;
+    }
+
+    toast('予約を削除しました');
+    closeConfirmDialog();
+    closeDetailModal();
+
+    // キャッシュクリアして再読み込み
+    delete state.reservationsByDate[r.date];
+
+    // 週カウントも更新
+    if (state.weekCounts[r.date] !== undefined && state.weekCounts[r.date] > 0) {
+      state.weekCounts[r.date]--;
+      renderWeekTabs();
+    }
+
+    await loadDayAndRender(state.selectedDate);
+  } catch (e) {
+    console.error(e);
+    toast('エラー: ' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '削除する';
+  }
 }
 
 function closeDetailModal() {
   document.getElementById('detailModal').classList.remove('show');
+  state.editingReservation = null;
+  state.isEditMode = false;
 }
 
 // =========================
