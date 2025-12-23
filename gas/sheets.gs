@@ -275,3 +275,57 @@ function deleteReservation_(reservationId) {
 
   return true;
 }
+
+/**
+ * 前日以前の予約データを物理削除
+ * @returns {Object} { deletedCount: number, message: string }
+ */
+function cleanupOldReservations_() {
+  const sh = _sheet(CFG.SHEETS.RESERVATIONS);
+  const map = getHeaderMap_(sh, 2);
+  const H = CFG.HEADER_MAP;
+
+  const lastRow = sh.getLastRow();
+  if (lastRow <= 2) {
+    return { deletedCount: 0, message: '削除対象のデータがありません' };
+  }
+
+  // 今日の日付を取得
+  const today = Utilities.formatDate(new Date(), CFG.TZ, 'yyyy-MM-dd');
+
+  // 日付列のインデックス
+  const dateCol = map[H.date];
+  if (!dateCol) throw new Error('日付列が見つかりません');
+
+  // 全データを取得
+  const lastCol = sh.getLastColumn();
+  const dataRange = sh.getRange(3, 1, lastRow - 2, lastCol);
+  const values = dataRange.getDisplayValues();
+
+  // 削除対象の行インデックスを収集（逆順で削除するため）
+  const rowsToDelete = [];
+
+  values.forEach((row, idx) => {
+    const dateValue = String(row[dateCol - 1] || '').trim();
+    // 日付が空でなく、今日より前の場合は削除対象
+    if (dateValue && dateValue < today) {
+      rowsToDelete.push(idx + 3); // 3行目から開始
+    }
+  });
+
+  if (rowsToDelete.length === 0) {
+    return { deletedCount: 0, message: '削除対象のデータがありません' };
+  }
+
+  // 下から削除（行番号がずれないように）
+  rowsToDelete.sort((a, b) => b - a);
+
+  for (const rowNum of rowsToDelete) {
+    sh.deleteRow(rowNum);
+  }
+
+  return {
+    deletedCount: rowsToDelete.length,
+    message: `${rowsToDelete.length}件の過去予約を削除しました`
+  };
+}

@@ -1,6 +1,17 @@
 /** api.gs */
 
 function getMasters() {
+  // 初期化時に過去予約をクリーンアップ（バックグラウンドで実行）
+  try {
+    const result = cleanupOldReservations_();
+    if (result.deletedCount > 0) {
+      console.log('Auto cleanup on init:', result.message);
+    }
+  } catch (e) {
+    // クリーンアップ失敗してもマスター取得は続行
+    console.error('Auto cleanup failed:', e);
+  }
+
   return readMasters_();
 }
 
@@ -205,4 +216,35 @@ function normalizePayload_(payload) {
     customerName: String(p.customerName || '').trim(),
     meetingDetail: String(p.meetingDetail || '').trim(),
   };
+}
+
+/**
+ * 前日以前の予約データを削除（クリーンアップ）
+ * Web UIから呼び出し可能、または時間トリガーで自動実行
+ * @returns {Object} { ok: boolean, deletedCount: number, message: string }
+ */
+function cleanupOldReservations() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+
+  try {
+    const result = cleanupOldReservations_();
+    console.log('Cleanup completed:', result.message);
+    return { ok: true, ...result };
+  } catch (e) {
+    console.error('Cleanup failed:', e);
+    return { ok: false, deletedCount: 0, message: String(e.message || e) };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 毎日自動実行用のトリガー関数
+ * GASエディタでトリガー設定: 毎日午前0時〜1時に実行推奨
+ */
+function dailyCleanup() {
+  const result = cleanupOldReservations();
+  console.log('Daily cleanup result:', JSON.stringify(result));
+  return result;
 }
