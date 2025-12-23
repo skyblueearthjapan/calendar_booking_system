@@ -47,13 +47,21 @@
     .brand{
       display:flex;
       align-items:center;
-      gap:8px;
+      gap:10px;
       font-weight:800;
       font-size:16px;
     }
-    .brand-dot{
-      width:10px;height:10px;border-radius:50%;background:#fff;
+    /* LINE WORKS テキストロゴ */
+    .lineworks-logo{
+      font-family:'Arial Black','Helvetica Neue',Arial,sans-serif;
+      font-weight:900;
+      letter-spacing:0.02em;
+      white-space:nowrap;
     }
+    .lineworks-logo.logo-sm{font-size:20px}
+    .lineworks-logo.logo-lg{font-size:36px}
+    .lineworks-logo.logo-white{color:#fff}
+    .lineworks-logo.logo-blue{color:#1a4b8c}
     .badge{
       font-size:11px;
       padding:3px 8px;
@@ -720,7 +728,7 @@
 <div class="topbar">
   <div class="topbar-inner">
     <div class="brand">
-      <div class="brand-dot"></div>
+      <span class="lineworks-logo logo-sm logo-white">LINE WORKS</span>
       <span>会議室予約</span>
       <span class="badge">Web入力 / シート表示</span>
     </div>
@@ -840,7 +848,7 @@
   <button class="welcome-close" onclick="closeWelcomeBoard()">&times;</button>
   <div class="welcome-content">
     <div class="welcome-room" id="welcomeRoom">第一会議室</div>
-    <div class="welcome-company">株式会社LINE WORKS</div>
+    <div class="welcome-company"><span class="lineworks-logo logo-lg logo-white">LINE WORKS</span></div>
     <div class="welcome-subtitle">W E L C O M E&nbsp;&nbsp;B O A R D</div>
     <div class="welcome-divider"></div>
     <div class="welcome-customer" id="welcomeCustomer">○○会社 ○○様</div>
