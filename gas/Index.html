@@ -164,6 +164,75 @@
       min-height:44px;
       border-bottom:2px solid var(--navy2) !important;
     }
+    .grid-header.room-header{
+      cursor:pointer;
+      transition:background .15s;
+    }
+    .grid-header.room-header:hover{
+      background:var(--navy2);
+    }
+    .grid-header.room-header.selected{
+      background:#2563EB;
+      box-shadow:inset 0 -3px 0 #FFD700;
+    }
+
+    /* Welcome Auto Toggle Bar */
+    .welcome-auto-bar{
+      display:none;
+      align-items:center;
+      justify-content:space-between;
+      background:linear-gradient(90deg, #059669, #10B981);
+      color:#fff;
+      padding:10px 16px;
+      border-radius:8px;
+      margin-bottom:12px;
+      box-shadow:0 4px 12px rgba(16,185,129,.25);
+    }
+    .welcome-auto-bar.show{display:flex}
+    .welcome-auto-bar .room-name{
+      font-weight:800;
+      font-size:14px;
+    }
+    .welcome-auto-bar .toggle-wrap{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .welcome-auto-bar .toggle-label{
+      font-size:13px;
+      font-weight:600;
+    }
+    .welcome-auto-bar .toggle-status{
+      font-size:12px;
+      opacity:.9;
+    }
+    .toggle-switch{
+      position:relative;
+      width:50px;
+      height:26px;
+      background:#fff;
+      border-radius:13px;
+      cursor:pointer;
+      transition:.2s;
+    }
+    .toggle-switch::after{
+      content:'';
+      position:absolute;
+      top:3px;
+      left:3px;
+      width:20px;
+      height:20px;
+      background:#ccc;
+      border-radius:50%;
+      transition:.2s;
+    }
+    .toggle-switch.on{
+      background:#FFD700;
+    }
+    .toggle-switch.on::after{
+      left:27px;
+      background:#059669;
+    }
 
     /* Time Column */
     .time-cell{
@@ -630,6 +699,16 @@
 
 <!-- Main Content -->
 <div class="container">
+  <!-- Welcome Auto Toggle Bar -->
+  <div class="welcome-auto-bar" id="welcomeAutoBar">
+    <div class="room-name" id="welcomeAutoRoom">第一会議室</div>
+    <div class="toggle-wrap">
+      <span class="toggle-label">WELCOME自動表示</span>
+      <div class="toggle-switch" id="welcomeAutoToggle" onclick="toggleWelcomeAuto()"></div>
+      <span class="toggle-status" id="welcomeAutoStatus">OFF</span>
+    </div>
+  </div>
+
   <!-- Day Info -->
   <div class="day-info">
     <div class="day-title" id="dayTitle">----</div>
@@ -757,7 +836,12 @@ const state = {
   roomColors: {},
   weekCounts: {}, // date -> total count
   editingReservation: null, // 現在編集中の予約
-  isEditMode: false // 編集モードかどうか
+  isEditMode: false, // 編集モードかどうか
+  // Welcome Auto Display
+  welcomeSelectedRoom: null, // 選択中の会議室
+  welcomeAutoEnabled: false, // 自動表示ON/OFF
+  welcomeAutoInterval: null, // ポーリング用インターバル
+  welcomeCurrentReservation: null // 現在表示中の予約
 };
 
 // =========================
@@ -885,6 +969,9 @@ async function init() {
     // Initial render
     await loadDayAndRender(state.selectedDate);
 
+    // Welcome Auto状態を復元
+    loadWelcomeAutoState();
+
     toast('初期化完了');
   } catch (e) {
     console.error(e);
@@ -1008,8 +1095,12 @@ function renderDayGrid() {
 
   rooms.forEach(room => {
     const roomHeader = document.createElement('div');
-    roomHeader.className = 'grid-cell grid-header';
+    roomHeader.className = 'grid-cell grid-header room-header';
+    if (state.welcomeSelectedRoom === room) {
+      roomHeader.classList.add('selected');
+    }
     roomHeader.textContent = room;
+    roomHeader.onclick = () => selectRoomForWelcome(room);
     headerRow.appendChild(roomHeader);
   });
   grid.appendChild(headerRow);
@@ -1509,6 +1600,239 @@ function updateWelcomeTime() {
   const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
   const dow = weekDays[now.getDay()];
   document.getElementById('welcomeDate').textContent = `${year}年${month}月${day}日(${dow})`;
+}
+
+// =========================
+// Welcome Auto Display
+// =========================
+function selectRoomForWelcome(room) {
+  // 同じ部屋をクリックしたら選択解除
+  if (state.welcomeSelectedRoom === room) {
+    state.welcomeSelectedRoom = null;
+    state.welcomeAutoEnabled = false;
+    stopWelcomeAutoPolling();
+    updateWelcomeAutoUI();
+    saveWelcomeAutoState();
+    renderDayGrid();
+    return;
+  }
+
+  state.welcomeSelectedRoom = room;
+  updateWelcomeAutoUI();
+  saveWelcomeAutoState();
+  renderDayGrid();
+}
+
+function updateWelcomeAutoUI() {
+  const bar = document.getElementById('welcomeAutoBar');
+  const roomEl = document.getElementById('welcomeAutoRoom');
+  const toggle = document.getElementById('welcomeAutoToggle');
+  const status = document.getElementById('welcomeAutoStatus');
+
+  if (state.welcomeSelectedRoom) {
+    bar.classList.add('show');
+    roomEl.textContent = state.welcomeSelectedRoom;
+
+    if (state.welcomeAutoEnabled) {
+      toggle.classList.add('on');
+      status.textContent = 'ON - 監視中';
+    } else {
+      toggle.classList.remove('on');
+      status.textContent = 'OFF';
+    }
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+function toggleWelcomeAuto() {
+  if (!state.welcomeSelectedRoom) return;
+
+  state.welcomeAutoEnabled = !state.welcomeAutoEnabled;
+
+  if (state.welcomeAutoEnabled) {
+    startWelcomeAutoPolling();
+    toast('WELCOME自動表示をONにしました');
+  } else {
+    stopWelcomeAutoPolling();
+    // WELCOMEが表示中なら閉じる
+    closeWelcomeBoard();
+    toast('WELCOME自動表示をOFFにしました');
+  }
+
+  updateWelcomeAutoUI();
+  saveWelcomeAutoState();
+}
+
+function startWelcomeAutoPolling() {
+  // すでに動いていたら停止
+  stopWelcomeAutoPolling();
+
+  // 即座に1回チェック
+  checkWelcomeAutoSwitch();
+
+  // 30秒ごとにチェック
+  state.welcomeAutoInterval = setInterval(checkWelcomeAutoSwitch, 30000);
+}
+
+function stopWelcomeAutoPolling() {
+  if (state.welcomeAutoInterval) {
+    clearInterval(state.welcomeAutoInterval);
+    state.welcomeAutoInterval = null;
+  }
+}
+
+async function checkWelcomeAutoSwitch() {
+  if (!state.welcomeAutoEnabled || !state.welcomeSelectedRoom) return;
+
+  const now = new Date();
+  const today = ymd(now);
+
+  // 今日の予約を取得（キャッシュまたはAPI）
+  if (!state.reservationsByDate[today]) {
+    try {
+      const list = await gasListReservations(today, today, '');
+      state.reservationsByDate[today] = list;
+    } catch (e) {
+      console.error('予約取得エラー:', e);
+      return;
+    }
+  }
+
+  const reservations = state.reservationsByDate[today] || [];
+
+  // 選択された会議室の予約のみフィルタ
+  const roomReservations = reservations.filter(r => r.room === state.welcomeSelectedRoom);
+
+  // 次の予約を探す（現在時刻の30分前〜終了時刻の間にある予約）
+  const nextReservation = findNextReservation(roomReservations, now, today);
+
+  if (nextReservation) {
+    // お客様名が空の場合はWELCOME表示しない
+    if (!nextReservation.customerName || !nextReservation.customerName.trim()) {
+      // WELCOMEを表示中なら閉じる
+      if (document.getElementById('welcomeBoard').classList.contains('show')) {
+        closeWelcomeBoard();
+      }
+      return;
+    }
+
+    // 開始30分前〜終了時刻の間ならWELCOME表示
+    const startTime = parseTimeToDate(today, nextReservation.startTime);
+    const endTime = parseTimeToDate(today, nextReservation.endTime);
+    const threshold = new Date(startTime.getTime() - 30 * 60 * 1000); // 30分前
+
+    if (now >= threshold && now < endTime) {
+      // 現在の表示と同じ予約なら何もしない
+      if (state.welcomeCurrentReservation?.reservationId === nextReservation.reservationId) {
+        return;
+      }
+
+      // WELCOME表示
+      showWelcomeBoardAuto(nextReservation);
+      state.welcomeCurrentReservation = nextReservation;
+    } else {
+      // 条件外ならDAYビューに戻す
+      if (document.getElementById('welcomeBoard').classList.contains('show')) {
+        closeWelcomeBoard();
+        state.welcomeCurrentReservation = null;
+      }
+    }
+  } else {
+    // 予約がない場合もDAYビューに戻す
+    if (document.getElementById('welcomeBoard').classList.contains('show')) {
+      closeWelcomeBoard();
+      state.welcomeCurrentReservation = null;
+    }
+  }
+}
+
+function findNextReservation(reservations, now, today) {
+  if (!reservations || reservations.length === 0) return null;
+
+  // 現在時刻以降の予約を時間順にソート
+  const sorted = reservations
+    .map(r => ({
+      ...r,
+      startDate: parseTimeToDate(today, r.startTime),
+      endDate: parseTimeToDate(today, r.endTime)
+    }))
+    .filter(r => r.endDate > now) // まだ終わっていない予約
+    .sort((a, b) => a.startDate - b.startDate);
+
+  return sorted[0] || null;
+}
+
+function parseTimeToDate(dateStr, timeStr) {
+  const [h, m] = timeStr.split(':').map(Number);
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setHours(h, m, 0, 0);
+  return d;
+}
+
+function showWelcomeBoardAuto(reservation) {
+  // Set welcome board content
+  document.getElementById('welcomeRoom').textContent = reservation.room;
+
+  // Format customer name with automatic "様" suffix
+  const customerEl = document.getElementById('welcomeCustomer');
+  const waitingEl = document.getElementById('welcomeWaiting');
+  const messageEl = document.querySelector('.welcome-message');
+
+  if (reservation.customerName && reservation.customerName.trim()) {
+    let displayName = reservation.customerName.trim();
+    // Add "様" if not already ending with it
+    if (!displayName.endsWith('様') && !displayName.endsWith('さま') && !displayName.endsWith('サマ')) {
+      displayName += ' 様';
+    }
+    customerEl.textContent = displayName;
+    customerEl.style.display = '';
+    messageEl.style.display = '';
+    waitingEl.style.display = 'none';
+  }
+
+  // Generate sparkles
+  generateSparkles();
+
+  // Show welcome board
+  document.getElementById('welcomeBoard').classList.add('show');
+
+  // Start time update
+  updateWelcomeTime();
+  if (!welcomeTimeInterval) {
+    welcomeTimeInterval = setInterval(updateWelcomeTime, 1000);
+  }
+}
+
+// localStorage保存/読み込み
+function saveWelcomeAutoState() {
+  try {
+    localStorage.setItem('welcomeAutoEnabled', state.welcomeAutoEnabled ? 'true' : 'false');
+    localStorage.setItem('welcomeSelectedRoom', state.welcomeSelectedRoom || '');
+  } catch (e) {
+    console.error('localStorage保存エラー:', e);
+  }
+}
+
+function loadWelcomeAutoState() {
+  try {
+    const enabled = localStorage.getItem('welcomeAutoEnabled') === 'true';
+    const room = localStorage.getItem('welcomeSelectedRoom');
+
+    if (room && state.masters.rooms.includes(room)) {
+      state.welcomeSelectedRoom = room;
+      state.welcomeAutoEnabled = enabled;
+
+      if (enabled) {
+        startWelcomeAutoPolling();
+      }
+
+      updateWelcomeAutoUI();
+      renderDayGrid();
+    }
+  } catch (e) {
+    console.error('localStorage読み込みエラー:', e);
+  }
 }
 
 // =========================
