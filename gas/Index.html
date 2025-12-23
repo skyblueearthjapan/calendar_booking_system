@@ -437,11 +437,13 @@
       .day-grid{grid-template-columns:60px repeat(var(--room-count), minmax(100px, 1fr))}
     }
 
-    /* Welcome Board Styles */
+    /* Welcome Board Styles - Festive Design */
     .welcome-overlay{
       position:fixed;
       inset:0;
-      background:linear-gradient(180deg, #0B3A66 0%, #1E5A8A 100%);
+      background:linear-gradient(135deg, #0B3A66 0%, #1E5A8A 30%, #2E6A9A 60%, #0B3A66 100%);
+      background-size:400% 400%;
+      animation:gradientShift 15s ease infinite;
       display:none;
       flex-direction:column;
       align-items:center;
@@ -450,8 +452,43 @@
       color:#fff;
       text-align:center;
       padding:40px;
+      overflow:hidden;
+    }
+    @keyframes gradientShift{
+      0%{background-position:0% 50%}
+      50%{background-position:100% 50%}
+      100%{background-position:0% 50%}
     }
     .welcome-overlay.show{display:flex}
+    .welcome-overlay::before{
+      content:'';
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,215,0,.15) 0%, transparent 25%),
+        radial-gradient(circle at 80% 30%, rgba(255,215,0,.1) 0%, transparent 20%),
+        radial-gradient(circle at 70% 80%, rgba(255,215,0,.12) 0%, transparent 22%),
+        radial-gradient(circle at 30% 70%, rgba(255,215,0,.08) 0%, transparent 18%);
+      pointer-events:none;
+    }
+    .welcome-sparkles{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      overflow:hidden;
+    }
+    .sparkle{
+      position:absolute;
+      width:8px;height:8px;
+      background:#FFD700;
+      border-radius:50%;
+      box-shadow:0 0 10px #FFD700, 0 0 20px #FFD700;
+      animation:sparkle 3s ease-in-out infinite;
+    }
+    @keyframes sparkle{
+      0%,100%{opacity:.3;transform:scale(.8)}
+      50%{opacity:1;transform:scale(1.2)}
+    }
     .welcome-close{
       position:absolute;
       top:20px;
@@ -468,43 +505,79 @@
       align-items:center;
       justify-content:center;
       transition:.2s;
+      z-index:10;
     }
     .welcome-close:hover{background:rgba(255,255,255,.25)}
+    .welcome-content{
+      position:relative;
+      z-index:5;
+      animation:fadeInUp .8s ease-out;
+    }
+    @keyframes fadeInUp{
+      from{opacity:0;transform:translateY(30px)}
+      to{opacity:1;transform:translateY(0)}
+    }
     .welcome-room{
       font-size:clamp(48px, 10vw, 96px);
       font-weight:900;
       margin-bottom:20px;
-      text-shadow:0 4px 20px rgba(0,0,0,.3);
+      text-shadow:0 4px 30px rgba(0,0,0,.4);
+      letter-spacing:.05em;
     }
     .welcome-company{
-      font-size:clamp(24px, 5vw, 42px);
-      font-weight:700;
+      font-size:clamp(20px, 4vw, 32px);
+      font-weight:600;
       margin-bottom:8px;
-      opacity:.95;
+      opacity:.9;
     }
     .welcome-subtitle{
-      font-size:clamp(16px, 3vw, 24px);
-      font-weight:600;
-      opacity:.8;
+      font-size:clamp(14px, 2.5vw, 20px);
+      font-weight:500;
+      opacity:.7;
       margin-bottom:50px;
-      letter-spacing:.15em;
+      letter-spacing:.2em;
+    }
+    .welcome-divider{
+      width:120px;
+      height:3px;
+      background:linear-gradient(90deg, transparent, #FFD700, transparent);
+      margin:0 auto 40px;
+      border-radius:2px;
     }
     .welcome-customer{
-      font-size:clamp(36px, 7vw, 64px);
+      font-size:clamp(40px, 8vw, 80px);
       font-weight:900;
       margin-bottom:30px;
+      text-shadow:0 4px 30px rgba(0,0,0,.3);
+      color:#FFD700;
+      animation:glow 2s ease-in-out infinite alternate;
+    }
+    @keyframes glow{
+      from{text-shadow:0 0 20px rgba(255,215,0,.4), 0 4px 30px rgba(0,0,0,.3)}
+      to{text-shadow:0 0 40px rgba(255,215,0,.6), 0 4px 30px rgba(0,0,0,.3)}
     }
     .welcome-message{
-      font-size:clamp(24px, 5vw, 42px);
+      font-size:clamp(22px, 4.5vw, 38px);
       font-weight:700;
-      line-height:1.6;
+      line-height:1.7;
+      text-shadow:0 2px 15px rgba(0,0,0,.3);
     }
     .welcome-time{
       position:absolute;
       bottom:30px;
       right:40px;
-      font-size:18px;
-      opacity:.7;
+      font-size:20px;
+      opacity:.6;
+      font-weight:600;
+      letter-spacing:.1em;
+    }
+    .welcome-date{
+      position:absolute;
+      bottom:30px;
+      left:40px;
+      font-size:16px;
+      opacity:.6;
+      font-weight:500;
     }
     .welcome-waiting{
       font-size:clamp(20px, 4vw, 32px);
@@ -512,17 +585,18 @@
       margin-top:40px;
     }
     .btn-welcome{
-      background:#10B981;
+      background:linear-gradient(135deg, #10B981, #059669);
       color:#fff;
       border:none;
       padding:10px 16px;
       border-radius:8px;
       font-weight:700;
       cursor:pointer;
-      transition:.15s;
+      transition:.2s;
       margin-right:8px;
+      box-shadow:0 4px 15px rgba(16,185,129,.3);
     }
-    .btn-welcome:hover{background:#059669}
+    .btn-welcome:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,.4)}
   </style>
 </head>
 <body>
@@ -635,21 +709,26 @@
   </div>
 </div>
 
-<!-- Welcome Board (Full Screen) -->
+<!-- Welcome Board (Full Screen - Festive) -->
 <div class="welcome-overlay" id="welcomeBoard">
+  <div class="welcome-sparkles" id="welcomeSparkles"></div>
   <button class="welcome-close" onclick="closeWelcomeBoard()">&times;</button>
-  <div class="welcome-room" id="welcomeRoom">第一会議室</div>
-  <div class="welcome-company">株式会社LINE WORKS</div>
-  <div class="welcome-subtitle">WELCOME BOARD</div>
-  <div class="welcome-customer" id="welcomeCustomer">○○会社 ○○様</div>
-  <div class="welcome-message">
-    ご来社ありがとうございます。<br>
-    お待ちしておりました。どうぞお入りください。
+  <div class="welcome-content">
+    <div class="welcome-room" id="welcomeRoom">第一会議室</div>
+    <div class="welcome-company">株式会社LINE WORKS</div>
+    <div class="welcome-subtitle">W E L C O M E&nbsp;&nbsp;B O A R D</div>
+    <div class="welcome-divider"></div>
+    <div class="welcome-customer" id="welcomeCustomer">○○会社 ○○様</div>
+    <div class="welcome-message">
+      ご来社ありがとうございます。<br>
+      お待ちしておりました。どうぞお入りください。
+    </div>
+    <div class="welcome-waiting" id="welcomeWaiting" style="display:none">
+      次のご予約をお待ちしています...
+    </div>
   </div>
-  <div class="welcome-waiting" id="welcomeWaiting" style="display:none">
-    次のご予約をお待ちしています...
-  </div>
-  <div class="welcome-time" id="welcomeTime">--:--</div>
+  <div class="welcome-date" id="welcomeDate">----年--月--日</div>
+  <div class="welcome-time" id="welcomeTime">--:--:--</div>
 </div>
 
 <script>
@@ -1340,25 +1419,34 @@ function showWelcomeBoard() {
 
   // Set welcome board content
   document.getElementById('welcomeRoom').textContent = r.room;
-  document.getElementById('welcomeCustomer').textContent = r.customerName || '様';
 
-  // Show/hide waiting message
-  const waitingEl = document.getElementById('welcomeWaiting');
+  // Format customer name with automatic "様" suffix
   const customerEl = document.getElementById('welcomeCustomer');
+  const waitingEl = document.getElementById('welcomeWaiting');
   const messageEl = document.querySelector('.welcome-message');
 
-  if (r.customerName) {
+  if (r.customerName && r.customerName.trim()) {
+    let displayName = r.customerName.trim();
+    // Add "様" if not already ending with it
+    if (!displayName.endsWith('様') && !displayName.endsWith('さま') && !displayName.endsWith('サマ')) {
+      displayName += ' 様';
+    }
+    customerEl.textContent = displayName;
     customerEl.style.display = '';
     messageEl.style.display = '';
     waitingEl.style.display = 'none';
   } else {
-    customerEl.textContent = '';
+    customerEl.textContent = 'ご来訪者 様';
+    customerEl.style.display = '';
     messageEl.style.display = '';
     waitingEl.style.display = 'none';
   }
 
   // Close detail modal
   closeDetailModal();
+
+  // Generate sparkles
+  generateSparkles();
 
   // Show welcome board
   document.getElementById('welcomeBoard').classList.add('show');
@@ -1374,6 +1462,24 @@ function closeWelcomeBoard() {
     clearInterval(welcomeTimeInterval);
     welcomeTimeInterval = null;
   }
+  // Clear sparkles
+  document.getElementById('welcomeSparkles').innerHTML = '';
+}
+
+function generateSparkles() {
+  const container = document.getElementById('welcomeSparkles');
+  container.innerHTML = '';
+
+  // Generate random sparkles
+  for (let i = 0; i < 20; i++) {
+    const sparkle = document.createElement('div');
+    sparkle.className = 'sparkle';
+    sparkle.style.left = Math.random() * 100 + '%';
+    sparkle.style.top = Math.random() * 100 + '%';
+    sparkle.style.animationDelay = (Math.random() * 3) + 's';
+    sparkle.style.transform = 'scale(' + (0.5 + Math.random() * 0.8) + ')';
+    container.appendChild(sparkle);
+  }
 }
 
 function updateWelcomeTime() {
@@ -1382,6 +1488,14 @@ function updateWelcomeTime() {
   const m = String(now.getMinutes()).padStart(2, '0');
   const s = String(now.getSeconds()).padStart(2, '0');
   document.getElementById('welcomeTime').textContent = `${h}:${m}:${s}`;
+
+  // Update date
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+  const dow = weekDays[now.getDay()];
+  document.getElementById('welcomeDate').textContent = `${year}年${month}月${day}日(${dow})`;
 }
 
 // =========================
