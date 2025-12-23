@@ -275,6 +275,39 @@
       /* Middle cells: just color, no text */
     }
 
+    /* Drag & Drop */
+    .res-cell.draggable{
+      cursor:grab;
+    }
+    .res-cell.draggable:active{
+      cursor:grabbing;
+    }
+    .res-cell.dragging{
+      opacity:.5;
+      outline:2px dashed var(--navy);
+    }
+    .grid-cell.drop-target{
+      background:#DBEAFE !important;
+      outline:2px solid #2563EB;
+    }
+    .grid-cell.drop-invalid{
+      background:#FEE2E2 !important;
+      outline:2px solid #DC2626;
+    }
+    .drag-ghost{
+      position:fixed;
+      pointer-events:none;
+      z-index:1000;
+      padding:8px 12px;
+      background:var(--navy);
+      color:#fff;
+      border-radius:6px;
+      font-size:12px;
+      font-weight:700;
+      box-shadow:0 8px 20px rgba(0,0,0,.3);
+      white-space:nowrap;
+    }
+
     /* Legend */
     .legend{
       display:flex;
@@ -841,7 +874,10 @@ const state = {
   welcomeSelectedRoom: null, // 選択中の会議室
   welcomeAutoEnabled: false, // 自動表示ON/OFF
   welcomeAutoInterval: null, // ポーリング用インターバル
-  welcomeCurrentReservation: null // 現在表示中の予約
+  welcomeCurrentReservation: null, // 現在表示中の予約
+  // Drag & Drop
+  dragging: null, // ドラッグ中の予約情報 { reservation, startCell, duration }
+  dragGhost: null // ドラッグゴースト要素
 };
 
 // =========================
@@ -1134,8 +1170,12 @@ function renderDayGrid() {
         cell.className += ' res-cell';
 
         if (rowIdx === resInfo.startIdx) {
-          // Start cell: show content
+          // Start cell: show content (draggable)
           const r = resInfo.res;
+          const duration = resInfo.endIdx - resInfo.startIdx; // スロット数
+          cell.classList.add('draggable');
+          cell.dataset.reservationId = r.reservationId;
+          cell.dataset.duration = duration;
           cell.innerHTML = `
             <div class="res-content">
               <div class="res-name">${escapeHtml(r.name)}</div>
@@ -1144,7 +1184,12 @@ function renderDayGrid() {
               ${r.meetingDetail ? `<div class="res-detail">${escapeHtml(summarize(r.meetingDetail, 20))}</div>` : ''}
             </div>
           `;
-          cell.onclick = () => showDetailModal(r);
+          // ドラッグ開始
+          cell.onpointerdown = (e) => startDrag(e, r, cell, duration);
+          // クリック（ドラッグしなかった場合）
+          cell.onclick = (e) => {
+            if (!state.dragging) showDetailModal(r);
+          };
         } else {
           // Continuation cell: just color
           cell.className += ' continuation';
@@ -1211,10 +1256,12 @@ function openFormModal(room, startTime) {
   document.getElementById('fRoom').value = room;
   document.getElementById('fStart').value = startTime;
 
-  // End = start + 30min (next slot)
+  // End = start + 1時間（2スロット先）、ただし業務終了時刻を超えない
   const idx = state.masters.slots.findIndex(s => s.start === startTime);
-  if (idx >= 0 && idx < state.masters.slots.length) {
-    document.getElementById('fEnd').value = state.masters.slots[idx].end;
+  if (idx >= 0) {
+    // +1時間 = 2スロット先の終了時刻
+    const endIdx = Math.min(idx + 2, state.masters.slots.length) - 1;
+    document.getElementById('fEnd').value = state.masters.slots[endIdx].end;
   }
 
   document.getElementById('fCustomer').value = '';
@@ -1510,6 +1557,207 @@ function shiftDay(delta) {
 
 function goToday() {
   selectDate(state.window.today);
+}
+
+// =========================
+// Drag & Drop
+// =========================
+let dragStartPos = null;
+let dragMoved = false;
+
+function startDrag(e, reservation, cell, duration) {
+  // 左クリックのみ
+  if (e.button !== 0) return;
+
+  e.preventDefault();
+  dragStartPos = { x: e.clientX, y: e.clientY };
+  dragMoved = false;
+
+  const onMove = (moveE) => {
+    const dx = Math.abs(moveE.clientX - dragStartPos.x);
+    const dy = Math.abs(moveE.clientY - dragStartPos.y);
+
+    // 5px以上動いたらドラッグ開始
+    if (!dragMoved && (dx > 5 || dy > 5)) {
+      dragMoved = true;
+      state.dragging = { reservation, startCell: cell, duration };
+      cell.classList.add('dragging');
+      createDragGhost(reservation, moveE);
+    }
+
+    if (dragMoved) {
+      updateDragGhost(moveE);
+      highlightDropTarget(moveE);
+    }
+  };
+
+  const onUp = async (upE) => {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+
+    if (dragMoved && state.dragging) {
+      cell.classList.remove('dragging');
+      removeDragGhost();
+      clearDropHighlights();
+
+      const target = getDropTarget(upE);
+      if (target && target.room && target.time) {
+        await moveReservation(state.dragging.reservation, target.room, target.time, state.dragging.duration);
+      }
+
+      state.dragging = null;
+    }
+
+    dragMoved = false;
+    dragStartPos = null;
+  };
+
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+}
+
+function createDragGhost(reservation, e) {
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  ghost.textContent = `${reservation.name} (${reservation.startTime}-${reservation.endTime})`;
+  ghost.style.left = e.clientX + 10 + 'px';
+  ghost.style.top = e.clientY + 10 + 'px';
+  document.body.appendChild(ghost);
+  state.dragGhost = ghost;
+}
+
+function updateDragGhost(e) {
+  if (state.dragGhost) {
+    state.dragGhost.style.left = e.clientX + 10 + 'px';
+    state.dragGhost.style.top = e.clientY + 10 + 'px';
+  }
+}
+
+function removeDragGhost() {
+  if (state.dragGhost) {
+    state.dragGhost.remove();
+    state.dragGhost = null;
+  }
+}
+
+function getDropTarget(e) {
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if (!el) return null;
+
+  const cell = el.closest('.grid-cell');
+  if (!cell || !cell.dataset.room || !cell.dataset.time) return null;
+
+  return {
+    room: cell.dataset.room,
+    time: cell.dataset.time,
+    rowIdx: parseInt(cell.dataset.rowIdx, 10)
+  };
+}
+
+function highlightDropTarget(e) {
+  clearDropHighlights();
+
+  const target = getDropTarget(e);
+  if (!target || !state.dragging) return;
+
+  const { duration, reservation } = state.dragging;
+  const startIdx = parseInt(target.rowIdx, 10);
+  const endIdx = startIdx + duration;
+
+  // ドロップ可能かチェック
+  const canDrop = checkCanDrop(target.room, startIdx, endIdx, reservation.reservationId);
+
+  // ハイライト
+  const cells = document.querySelectorAll(`.grid-cell[data-room="${target.room}"]`);
+  cells.forEach(cell => {
+    const idx = parseInt(cell.dataset.rowIdx, 10);
+    if (idx >= startIdx && idx < endIdx) {
+      cell.classList.add(canDrop ? 'drop-target' : 'drop-invalid');
+    }
+  });
+}
+
+function clearDropHighlights() {
+  document.querySelectorAll('.drop-target, .drop-invalid').forEach(el => {
+    el.classList.remove('drop-target', 'drop-invalid');
+  });
+}
+
+function checkCanDrop(room, startIdx, endIdx, excludeId) {
+  const slots = state.masters.slots;
+  if (endIdx > slots.length) return false; // 範囲外
+
+  const reservations = state.reservationsByDate[state.selectedDate] || [];
+  const roomReservations = reservations.filter(r => r.room === room && r.reservationId !== excludeId);
+
+  const newStart = slots[startIdx].start;
+  const newEnd = slots[endIdx - 1].end;
+
+  // 重複チェック
+  for (const r of roomReservations) {
+    if (r.startTime < newEnd && r.endTime > newStart) {
+      return false; // 重複あり
+    }
+  }
+
+  return true;
+}
+
+async function moveReservation(reservation, newRoom, newStartTime, duration) {
+  const slots = state.masters.slots;
+  const startIdx = slots.findIndex(s => s.start === newStartTime);
+  if (startIdx < 0) {
+    toast('移動先が不正です');
+    return;
+  }
+
+  const endIdx = startIdx + duration;
+  if (endIdx > slots.length) {
+    toast('予約時間が業務時間を超えます');
+    return;
+  }
+
+  const newEndTime = slots[endIdx - 1].end;
+
+  // 重複チェック
+  if (!checkCanDrop(newRoom, startIdx, endIdx, reservation.reservationId)) {
+    toast('この時間帯は既に予約があります');
+    return;
+  }
+
+  // 同じ位置なら何もしない
+  if (reservation.room === newRoom && reservation.startTime === newStartTime) {
+    return;
+  }
+
+  // 更新APIを呼ぶ
+  try {
+    const payload = {
+      date: state.selectedDate,
+      startTime: newStartTime,
+      endTime: newEndTime,
+      room: newRoom,
+      name: reservation.name,
+      customerName: reservation.customerName,
+      meetingDetail: reservation.meetingDetail
+    };
+
+    const res = await gasUpdateReservation(reservation.reservationId, payload);
+    if (!res.ok) {
+      toast(res.message || '移動に失敗しました');
+      return;
+    }
+
+    toast('予約を移動しました');
+
+    // キャッシュクリアして再描画
+    delete state.reservationsByDate[state.selectedDate];
+    await loadDayAndRender(state.selectedDate);
+
+  } catch (e) {
+    console.error(e);
+    toast('エラー: ' + (e.message || e));
+  }
 }
 
 // =========================
