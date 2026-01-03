@@ -541,19 +541,15 @@
 
     /* Save Status Indicator (A+C+B) */
     .save-status{
-      position:fixed;
-      top:60px;
-      right:16px;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
       padding:6px 12px;
       border-radius:6px;
       font-size:12px;
       font-weight:600;
-      display:flex;
-      align-items:center;
-      gap:6px;
-      z-index:150;
-      transition:all .2s;
       box-shadow:0 2px 8px rgba(0,0,0,.15);
+      transition:all .2s;
     }
     .save-status.saved{
       background:#059669;
@@ -799,12 +795,6 @@
   </div>
 </div>
 
-<!-- Save Status Indicator (A+C+B) -->
-<div class="save-status saved" id="saveStatus">
-  <span class="status-icon">✓</span>
-  <span class="status-text">保存済み</span>
-</div>
-
 <!-- Main Content -->
 <div class="container">
   <!-- Welcome Auto Toggle Bar -->
@@ -821,6 +811,11 @@
   <div class="day-info">
     <div class="day-title" id="dayTitle">----</div>
     <div class="day-nav">
+      <!-- Save Status Indicator (A+C+B) -->
+      <div class="save-status saved" id="saveStatus">
+        <span class="status-icon">✓</span>
+        <span class="status-text">保存済み</span>
+      </div>
       <button class="nav-btn" onclick="shiftDay(-1)">&#9664; 前日</button>
       <button class="nav-btn" onclick="goToday()">今日</button>
       <button class="nav-btn" onclick="shiftDay(1)">翌日 &#9654;</button>
