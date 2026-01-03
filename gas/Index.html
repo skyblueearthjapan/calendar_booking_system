@@ -539,6 +539,61 @@
     }
     .toast.show{display:block}
 
+    /* Save Status Indicator (A+C+B) */
+    .save-status{
+      position:fixed;
+      top:60px;
+      right:16px;
+      padding:6px 12px;
+      border-radius:6px;
+      font-size:12px;
+      font-weight:600;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      z-index:150;
+      transition:all .2s;
+      box-shadow:0 2px 8px rgba(0,0,0,.15);
+    }
+    .save-status.saved{
+      background:#059669;
+      color:#fff;
+    }
+    .save-status.saving{
+      background:#F59E0B;
+      color:#fff;
+    }
+    .save-status.unsaved{
+      background:#DC2626;
+      color:#fff;
+    }
+    .save-status.offline{
+      background:#6B7280;
+      color:#fff;
+    }
+    .save-status .spinner{
+      width:14px;
+      height:14px;
+      border:2px solid rgba(255,255,255,.3);
+      border-top-color:#fff;
+      border-radius:50%;
+      animation:spin .8s linear infinite;
+    }
+    @keyframes spin{
+      to{transform:rotate(360deg)}
+    }
+    .save-status .retry-btn{
+      background:rgba(255,255,255,.2);
+      border:none;
+      color:#fff;
+      padding:2px 8px;
+      border-radius:4px;
+      cursor:pointer;
+      font-size:11px;
+      margin-left:4px;
+    }
+    .save-status .retry-btn:hover{background:rgba(255,255,255,.3)}
+
     /* Responsive */
     @media(max-width:768px){
       .week-tabs{gap:3px}
@@ -744,6 +799,12 @@
   </div>
 </div>
 
+<!-- Save Status Indicator (A+C+B) -->
+<div class="save-status saved" id="saveStatus">
+  <span class="status-icon">✓</span>
+  <span class="status-text">保存済み</span>
+</div>
+
 <!-- Main Content -->
 <div class="container">
   <!-- Welcome Auto Toggle Bar -->
@@ -896,6 +957,305 @@ const state = {
 };
 
 // =========================
+// SyncManager (A+C+B方式)
+// =========================
+const SyncManager = {
+  STORAGE_KEY: 'calendar_sync',
+  DEBOUNCE_MS: 3000,        // 無操作3秒で自動保存
+  RETRY_INTERVAL_MS: 30000, // 30秒ごとにリトライ
+
+  // 状態
+  queue: [],           // C: 変更キュー
+  drafts: {},          // A: ローカルドラフト
+  inflight: false,     // 送信中フラグ
+  debounceTimer: null, // デバウンスタイマー
+  retryTimer: null,    // リトライタイマー
+  isOnline: navigator.onLine,
+
+  // 初期化
+  init() {
+    this.loadFromStorage();
+    this.updateStatusUI('saved');
+
+    // オンライン/オフライン監視
+    window.addEventListener('online', () => {
+      this.isOnline = true;
+      this.flush();
+    });
+    window.addEventListener('offline', () => {
+      this.isOnline = false;
+      this.updateStatusUI('offline');
+    });
+
+    // ページ離脱前に保存試行
+    window.addEventListener('beforeunload', (e) => {
+      this.saveToStorage();
+      if (this.queue.length > 0) {
+        e.preventDefault();
+        e.returnValue = '未保存のデータがあります';
+      }
+    });
+
+    // 起動時に未送信キューがあれば送信
+    if (this.queue.length > 0) {
+      this.updateStatusUI('unsaved');
+      setTimeout(() => this.flush(), 1000);
+    }
+
+    // 定期リトライ開始
+    this.startRetryTimer();
+  },
+
+  // ストレージ読み込み
+  loadFromStorage() {
+    try {
+      const data = localStorage.getItem(this.STORAGE_KEY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        this.queue = parsed.queue || [];
+        this.drafts = parsed.drafts || {};
+      }
+    } catch (e) {
+      console.error('SyncManager loadFromStorage error:', e);
+    }
+  },
+
+  // ストレージ保存
+  saveToStorage() {
+    try {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify({
+        queue: this.queue,
+        drafts: this.drafts
+      }));
+    } catch (e) {
+      console.error('SyncManager saveToStorage error:', e);
+    }
+  },
+
+  // ドラフト保存（A）
+  saveDraft(recordId, data) {
+    this.drafts[recordId] = {
+      ...data,
+      _savedAt: Date.now()
+    };
+    this.saveToStorage();
+  },
+
+  // ドラフト取得
+  getDraft(recordId) {
+    return this.drafts[recordId] || null;
+  },
+
+  // ドラフト削除
+  clearDraft(recordId) {
+    delete this.drafts[recordId];
+    this.saveToStorage();
+  },
+
+  // 変更をキューに追加（C）
+  enqueue(recordId, patch, revision = null) {
+    // 同じrecordIdの古いエントリを削除してマージ
+    const existingIdx = this.queue.findIndex(q => q.recordId === recordId);
+    if (existingIdx >= 0) {
+      const existing = this.queue[existingIdx];
+      this.queue[existingIdx] = {
+        recordId,
+        patch: { ...existing.patch, ...patch },
+        revision: revision || existing.revision,
+        queuedAt: Date.now()
+      };
+    } else {
+      this.queue.push({
+        recordId,
+        patch,
+        revision,
+        queuedAt: Date.now()
+      });
+    }
+
+    this.saveToStorage();
+    this.updateStatusUI('unsaved');
+    this.scheduleFlush();
+  },
+
+  // デバウンス付きフラッシュスケジュール
+  scheduleFlush() {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.flush();
+    }, this.DEBOUNCE_MS);
+  },
+
+  // キューをサーバーに送信（B）
+  async flush() {
+    if (this.inflight || this.queue.length === 0) return;
+    if (!this.isOnline) {
+      this.updateStatusUI('offline');
+      return;
+    }
+
+    this.inflight = true;
+    this.updateStatusUI('saving');
+
+    // キューから1件ずつ処理
+    const item = this.queue[0];
+
+    try {
+      const result = await this.sendToServer(item.recordId, item.patch, item.revision);
+
+      if (result.ok) {
+        // 成功：キューから削除
+        this.queue.shift();
+
+        // 仮IDから正式IDへの置換
+        if (result.oldTempId && result.recordId !== result.oldTempId) {
+          this.replaceTempId(result.oldTempId, result.recordId);
+        }
+
+        // ドラフトクリア
+        this.clearDraft(item.recordId);
+
+        this.saveToStorage();
+
+        // まだキューがあれば続行
+        if (this.queue.length > 0) {
+          this.inflight = false;
+          this.flush();
+        } else {
+          this.updateStatusUI('saved');
+          toast(result.message || '保存しました');
+
+          // キャッシュクリアして再描画
+          await this.refreshAfterSync(item.patch.date);
+        }
+      } else {
+        // 失敗
+        console.error('Sync failed:', result);
+
+        if (result.code === 'CONFLICT') {
+          toast(result.message);
+          // 重複エラーの場合はキューから削除
+          this.queue.shift();
+          this.saveToStorage();
+        } else if (result.code === 'STALE') {
+          toast(result.message);
+          // 古いデータの場合はキューから削除
+          this.queue.shift();
+          this.saveToStorage();
+        }
+
+        this.updateStatusUI('unsaved');
+      }
+    } catch (e) {
+      console.error('Sync error:', e);
+      this.updateStatusUI('unsaved');
+    } finally {
+      this.inflight = false;
+    }
+  },
+
+  // サーバー送信
+  sendToServer(recordId, patch, revision) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        .applyPatch(recordId, patch, revision);
+    });
+  },
+
+  // 仮IDを正式IDに置換
+  replaceTempId(oldId, newId) {
+    // ドラフト置換
+    if (this.drafts[oldId]) {
+      this.drafts[newId] = this.drafts[oldId];
+      delete this.drafts[oldId];
+    }
+
+    // キュー内の置換
+    this.queue.forEach(q => {
+      if (q.recordId === oldId) {
+        q.recordId = newId;
+      }
+    });
+
+    // state内のキャッシュも更新
+    Object.values(state.reservationsByDate).forEach(list => {
+      list.forEach(r => {
+        if (r.reservationId === oldId) {
+          r.reservationId = newId;
+        }
+      });
+    });
+  },
+
+  // 同期後のリフレッシュ
+  async refreshAfterSync(date) {
+    if (date) {
+      delete state.reservationsByDate[date];
+    }
+    await loadWeekData();
+    await loadDayAndRender(state.selectedDate);
+  },
+
+  // リトライタイマー開始
+  startRetryTimer() {
+    if (this.retryTimer) clearInterval(this.retryTimer);
+    this.retryTimer = setInterval(() => {
+      if (this.queue.length > 0 && !this.inflight) {
+        this.flush();
+      }
+    }, this.RETRY_INTERVAL_MS);
+  },
+
+  // UI更新
+  updateStatusUI(status) {
+    const el = document.getElementById('saveStatus');
+    if (!el) return;
+
+    el.className = 'save-status ' + status;
+
+    const iconEl = el.querySelector('.status-icon');
+    const textEl = el.querySelector('.status-text');
+
+    // 既存のリトライボタンを削除
+    const existingBtn = el.querySelector('.retry-btn');
+    if (existingBtn) existingBtn.remove();
+
+    switch (status) {
+      case 'saved':
+        iconEl.innerHTML = '✓';
+        textEl.textContent = '保存済み';
+        break;
+      case 'saving':
+        iconEl.innerHTML = '<div class="spinner"></div>';
+        textEl.textContent = '保存中...';
+        break;
+      case 'unsaved':
+        iconEl.innerHTML = '!';
+        textEl.textContent = `未保存 (${this.queue.length}件)`;
+        const btn = document.createElement('button');
+        btn.className = 'retry-btn';
+        btn.textContent = '再試行';
+        btn.onclick = () => this.flush();
+        el.appendChild(btn);
+        break;
+      case 'offline':
+        iconEl.innerHTML = '⚡';
+        textEl.textContent = 'オフライン';
+        break;
+    }
+  },
+
+  // 仮ID生成
+  generateTempId() {
+    return 'tmp-' + crypto.randomUUID();
+  }
+};
+
+// =========================
 // Utils
 // =========================
 function toast(msg) {
@@ -994,6 +1354,9 @@ function gasDeleteReservation(reservationId) {
 // =========================
 async function init() {
   try {
+    // SyncManager初期化（A+C+B方式）
+    SyncManager.init();
+
     const [masters, win] = await Promise.all([gasGetMasters(), gasGetWindow()]);
     state.masters = masters;
     state.window = win;
@@ -1305,37 +1668,45 @@ async function submitReservation() {
     meetingDetail: document.getElementById('fDetail').value
   };
 
-  btn.disabled = true;
-  btn.textContent = '登録中...';
-
-  try {
-    const res = await gasCreateReservation(payload);
-    if (!res.ok) {
-      hint.textContent = res.message || '登録に失敗しました';
-      toast(res.message || '登録失敗');
-      return;
-    }
-
-    toast('予約を登録しました');
-    closeFormModal();
-
-    // Clear cache and reload
-    delete state.reservationsByDate[payload.date];
-    await loadDayAndRender(payload.date);
-
-    // Update week counts
-    if (state.weekCounts[payload.date] !== undefined) {
-      state.weekCounts[payload.date]++;
-      renderWeekTabs();
-    }
-  } catch (e) {
-    console.error(e);
-    hint.textContent = String(e.message || e);
-    toast('エラー: ' + (e.message || e));
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '予約する';
+  // バリデーション
+  if (!payload.date || !payload.startTime || !payload.endTime || !payload.room || !payload.name) {
+    hint.textContent = '必須項目を入力してください';
+    return;
   }
+
+  // A+C+B方式: 仮ID生成してローカル保存 → キューに追加 → UI即時閉じる
+  const tempId = SyncManager.generateTempId();
+
+  // A: ローカルドラフト保存
+  SyncManager.saveDraft(tempId, payload);
+
+  // C: キューに追加（3秒後に自動送信）
+  SyncManager.enqueue(tempId, payload);
+
+  // UIは即座に閉じる（入力を止めない）
+  closeFormModal();
+  toast('予約を登録中...');
+
+  // ローカルキャッシュに仮追加（即時反映）
+  const tempReservation = {
+    reservationId: tempId,
+    ...payload,
+    status: 'active'
+  };
+
+  if (!state.reservationsByDate[payload.date]) {
+    state.reservationsByDate[payload.date] = [];
+  }
+  state.reservationsByDate[payload.date].push(tempReservation);
+
+  // Update week counts
+  if (state.weekCounts[payload.date] !== undefined) {
+    state.weekCounts[payload.date]++;
+    renderWeekTabs();
+  }
+
+  // グリッド再描画（仮データで即時表示）
+  renderDayGrid();
 }
 
 // =========================
@@ -1463,36 +1834,63 @@ async function submitUpdate() {
     meetingDetail: document.getElementById('editDetail').value
   };
 
-  btn.disabled = true;
-  btn.textContent = '保存中...';
-
-  try {
-    const res = await gasUpdateReservation(r.reservationId, payload);
-    if (!res.ok) {
-      hint.textContent = res.message || '更新に失敗しました';
-      toast(res.message || '更新失敗');
-      return;
-    }
-
-    toast('予約を更新しました');
-    closeDetailModal();
-
-    // キャッシュクリアして再読み込み
-    const oldDate = r.date;
-    delete state.reservationsByDate[oldDate];
-    delete state.reservationsByDate[payload.date];
-
-    // 週カウントも再取得
-    await loadWeekData();
-    await loadDayAndRender(state.selectedDate);
-  } catch (e) {
-    console.error(e);
-    hint.textContent = String(e.message || e);
-    toast('エラー: ' + (e.message || e));
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '保存する';
+  // バリデーション
+  if (!payload.date || !payload.startTime || !payload.endTime || !payload.room || !payload.name) {
+    hint.textContent = '必須項目を入力してください';
+    return;
   }
+
+  // A+C+B方式: ローカル更新 → キューに追加 → UI即時閉じる
+  const recordId = r.reservationId;
+  const oldDate = r.date;
+
+  // A: ローカルドラフト保存
+  SyncManager.saveDraft(recordId, payload);
+
+  // C: キューに追加（3秒後に自動送信）
+  SyncManager.enqueue(recordId, payload, Date.now());
+
+  // UIは即座に閉じる
+  closeDetailModal();
+  toast('予約を更新中...');
+
+  // ローカルキャッシュを即時更新
+  const listOld = state.reservationsByDate[oldDate];
+  if (listOld) {
+    const idx = listOld.findIndex(x => x.reservationId === recordId);
+    if (idx >= 0) {
+      // 日付が変わった場合は古いリストから削除
+      if (oldDate !== payload.date) {
+        listOld.splice(idx, 1);
+        // 新しい日付のリストに追加
+        if (!state.reservationsByDate[payload.date]) {
+          state.reservationsByDate[payload.date] = [];
+        }
+        state.reservationsByDate[payload.date].push({
+          reservationId: recordId,
+          ...payload,
+          status: 'active'
+        });
+        // カウント更新
+        if (state.weekCounts[oldDate] !== undefined && state.weekCounts[oldDate] > 0) {
+          state.weekCounts[oldDate]--;
+        }
+        if (state.weekCounts[payload.date] !== undefined) {
+          state.weekCounts[payload.date]++;
+        }
+      } else {
+        // 同じ日付なら上書き
+        listOld[idx] = {
+          reservationId: recordId,
+          ...payload,
+          status: 'active'
+        };
+      }
+    }
+  }
+
+  renderWeekTabs();
+  renderDayGrid();
 }
 
 function confirmDelete() {

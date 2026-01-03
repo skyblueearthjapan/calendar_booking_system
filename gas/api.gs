@@ -248,3 +248,142 @@ function dailyCleanup() {
   console.log('Daily cleanup result:', JSON.stringify(result));
   return result;
 }
+
+/**
+ * A+C+B方式: パッチ適用API（upsert）
+ * クライアントからの変更をまとめて適用
+ * @param {string} recordId - 予約ID（tmp-で始まる場合は新規）
+ * @param {Object} patch - 変更フィールド
+ * @param {number} clientRevision - クライアント側のリビジョン
+ * @returns {Object} { ok, serverRevision, recordId, message }
+ */
+function applyPatch(recordId, patch, clientRevision) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+
+  try {
+    const isNew = !recordId || recordId.startsWith('tmp-');
+
+    if (isNew) {
+      // 新規作成
+      const p = normalizePayload_(patch);
+      assertPayload_(p);
+
+      // 重複チェック
+      const { rows } = readAllReservations_();
+      const newStart = parseDateTime_(p.date, p.startTime);
+      const newEnd = parseDateTime_(p.date, p.endTime);
+
+      const conflicts = rows.filter(r => {
+        if (r.status && r.status !== 'active') return false;
+        if (r.date !== p.date) return false;
+        if (r.room !== p.room) return false;
+        const exStart = parseDateTime_(r.date, r.startTime);
+        const exEnd = parseDateTime_(r.date, r.endTime);
+        return isOverlapping_(newStart, newEnd, exStart, exEnd);
+      });
+
+      if (conflicts.length > 0) {
+        return { ok: false, code: 'CONFLICT', message: 'この時間帯は既に予約があります（重複）' };
+      }
+
+      // 正式ID生成して保存
+      const newId = Utilities.getUuid();
+      p.reservationId = newId;
+      appendReservation_(p);
+
+      // 表示シート更新
+      try {
+        renderDay(p.date);
+        render2Weeks(getWindowBase_().today);
+      } catch (e) {
+        console.error('render failed:', e);
+      }
+
+      return {
+        ok: true,
+        recordId: newId,
+        oldTempId: recordId,
+        serverRevision: Date.now(),
+        message: '予約を登録しました'
+      };
+
+    } else {
+      // 更新（upsert）
+      const { rows } = readAllReservations_();
+      const existing = rows.find(r => r.reservationId === recordId && r.status === 'active');
+
+      if (!existing) {
+        return { ok: false, code: 'NOT_FOUND', message: '予約が見つかりません' };
+      }
+
+      // リビジョンチェック（サーバー側が新しい場合は拒否）
+      // ※ここでは updatedAt を使用
+      const serverTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      if (clientRevision && serverTime > clientRevision) {
+        return {
+          ok: false,
+          code: 'STALE',
+          message: 'データが更新されています。再読み込みしてください。',
+          serverRevision: serverTime
+        };
+      }
+
+      // マージして更新
+      const merged = {
+        date: patch.date || existing.date,
+        startTime: patch.startTime || existing.startTime,
+        endTime: patch.endTime || existing.endTime,
+        room: patch.room || existing.room,
+        name: patch.name || existing.name,
+        customerName: patch.customerName !== undefined ? patch.customerName : existing.customerName,
+        meetingDetail: patch.meetingDetail !== undefined ? patch.meetingDetail : existing.meetingDetail
+      };
+
+      const p = normalizePayload_(merged);
+      assertPayload_(p);
+
+      // 重複チェック（自分自身は除く）
+      const newStart = parseDateTime_(p.date, p.startTime);
+      const newEnd = parseDateTime_(p.date, p.endTime);
+
+      const conflicts = rows.filter(r => {
+        if (r.reservationId === recordId) return false;
+        if (r.status && r.status !== 'active') return false;
+        if (r.date !== p.date) return false;
+        if (r.room !== p.room) return false;
+        const exStart = parseDateTime_(r.date, r.startTime);
+        const exEnd = parseDateTime_(r.date, r.endTime);
+        return isOverlapping_(newStart, newEnd, exStart, exEnd);
+      });
+
+      if (conflicts.length > 0) {
+        return { ok: false, code: 'CONFLICT', message: 'この時間帯は既に予約があります（重複）' };
+      }
+
+      // 更新実行
+      updateReservation_(recordId, p);
+
+      // 表示シート更新
+      try {
+        renderDay(p.date);
+        if (existing.date !== p.date) renderDay(existing.date);
+        render2Weeks(getWindowBase_().today);
+      } catch (e) {
+        console.error('render failed:', e);
+      }
+
+      return {
+        ok: true,
+        recordId: recordId,
+        serverRevision: Date.now(),
+        message: '予約を更新しました'
+      };
+    }
+  } catch (e) {
+    console.error('applyPatch error:', e);
+    return { ok: false, code: 'ERROR', message: String(e.message || e) };
+  } finally {
+    lock.releaseLock();
+  }
+}
