@@ -610,6 +610,65 @@
     }
     .save-status .retry-btn:hover{background:rgba(255,255,255,.3)}
 
+    /* Edit Toggle */
+    .edit-toggle-bar{
+      display:flex;
+      align-items:center;
+      margin-bottom:12px;
+    }
+    .edit-toggle{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      cursor:pointer;
+      user-select:none;
+      -webkit-user-select:none;
+    }
+    .edit-toggle input{display:none}
+    .edit-toggle__slider{
+      position:relative;
+      width:44px;
+      height:24px;
+      background:#cbd5e0;
+      border-radius:12px;
+      transition:background .2s;
+    }
+    .edit-toggle__slider::after{
+      content:'';
+      position:absolute;
+      top:2px;
+      left:2px;
+      width:20px;
+      height:20px;
+      background:#fff;
+      border-radius:50%;
+      transition:transform .2s;
+      box-shadow:0 1px 3px rgba(0,0,0,.2);
+    }
+    .edit-toggle input:checked + .edit-toggle__slider{
+      background:#2f9e44;
+    }
+    .edit-toggle input:checked + .edit-toggle__slider::after{
+      transform:translateX(20px);
+    }
+    .edit-toggle__label{
+      font-size:14px;
+      font-weight:600;
+      color:#4a5568;
+    }
+    /* Edit lock: disable grid interactions */
+    .edit-locked .empty-cell{
+      pointer-events:none;
+      cursor:default;
+    }
+    .edit-locked .res-cell{
+      pointer-events:none;
+      cursor:default;
+    }
+    .edit-locked .empty-cell:hover{
+      background:#fff;
+    }
+
     /* Responsive */
     @media(max-width:768px){
       .week-tabs{gap:3px}
@@ -828,6 +887,15 @@
     </div>
   </div>
 
+  <!-- Edit Toggle -->
+  <div class="edit-toggle-bar">
+    <label class="edit-toggle">
+      <input type="checkbox" id="editToggle" />
+      <span class="edit-toggle__slider"></span>
+      <span class="edit-toggle__label" id="editToggleLabel">読み取り専用</span>
+    </label>
+  </div>
+
   <!-- Day Info -->
   <div class="day-info">
     <div class="day-title" id="dayTitle">----</div>
@@ -844,7 +912,7 @@
   </div>
 
   <!-- DAY Grid -->
-  <div class="grid-wrap">
+  <div class="grid-wrap edit-locked" id="gridWrap">
     <div class="day-grid" id="dayGrid">
       <!-- Grid injected -->
     </div>
@@ -1390,6 +1458,7 @@ async function init() {
       state.weekDays.push(addDays(win.today, i));
     }
 
+    initEditToggle();
     buildFormOptions();
     buildLegend();
 
@@ -1464,6 +1533,9 @@ function selectDate(dateStr) {
 // =========================
 async function loadDayAndRender(dateStr) {
   state.selectedDate = dateStr;
+
+  // 編集トグルをOFFにリセット
+  resetEditToggle();
 
   // Check cache or fetch
   if (!state.reservationsByDate[dateStr]) {
@@ -2510,6 +2582,30 @@ function loadWelcomeAutoState() {
   } catch (e) {
     console.error('localStorage読み込みエラー:', e);
   }
+}
+
+// =========================
+// Edit Toggle
+// =========================
+function initEditToggle() {
+  var editToggle = document.getElementById('editToggle');
+  var editToggleLabel = document.getElementById('editToggleLabel');
+  var gridWrap = document.getElementById('gridWrap');
+
+  editToggle.addEventListener('change', function() {
+    var locked = !editToggle.checked;
+    gridWrap.classList.toggle('edit-locked', locked);
+    editToggleLabel.textContent = locked ? '読み取り専用' : '編集可能';
+  });
+}
+
+function resetEditToggle() {
+  var editToggle = document.getElementById('editToggle');
+  var editToggleLabel = document.getElementById('editToggleLabel');
+  var gridWrap = document.getElementById('gridWrap');
+  editToggle.checked = false;
+  editToggleLabel.textContent = '読み取り専用';
+  gridWrap.classList.add('edit-locked');
 }
 
 // =========================
