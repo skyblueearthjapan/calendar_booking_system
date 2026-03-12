@@ -177,7 +177,14 @@
       background:#fff;
     }
     .grid-cell:last-child{border-right:none}
+    .grid-cell.room-col:last-child{border-right:3px solid var(--room-color, var(--line))}
     .grid-row:last-child .grid-cell{border-bottom:none}
+
+    /* Room column border (applied via inline style --room-color) */
+    .grid-cell.room-col{
+      border-left:3px solid var(--room-color, var(--line));
+      border-right:3px solid var(--room-color, var(--line));
+    }
 
     /* Header Row */
     .grid-header{
@@ -195,6 +202,8 @@
     .grid-header.room-header{
       cursor:pointer;
       transition:background .15s;
+      border-left:3px solid var(--room-color, var(--navy));
+      border-right:3px solid var(--room-color, var(--navy));
     }
     .grid-header.room-header:hover{
       background:var(--navy2);
@@ -202,6 +211,16 @@
     .grid-header.room-header.selected{
       background:#2563EB;
       box-shadow:inset 0 -3px 0 #FFD700;
+    }
+    /* Room header color strip at bottom */
+    .grid-header.room-header::after{
+      content:'';
+      position:absolute;
+      bottom:0;
+      left:0;
+      right:0;
+      height:4px;
+      background:var(--room-color, transparent);
     }
 
     /* Welcome Auto Toggle Bar */
@@ -666,7 +685,7 @@
       cursor:default;
     }
     .edit-locked .empty-cell:hover{
-      background:#fff;
+      background:inherit;
     }
 
     /* Responsive */
@@ -1601,6 +1620,8 @@ function renderDayGrid() {
     if (state.welcomeSelectedRoom === room) {
       roomHeader.classList.add('selected');
     }
+    const roomColor = state.roomColors[room] || '#E5E7EB';
+    roomHeader.style.setProperty('--room-color', roomColor);
     roomHeader.textContent = room;
     roomHeader.onclick = () => selectRoomForWelcome(room);
     headerRow.appendChild(roomHeader);
@@ -1622,16 +1643,20 @@ function renderDayGrid() {
     // Room cells
     rooms.forEach(room => {
       const cell = document.createElement('div');
-      cell.className = 'grid-cell';
+      cell.className = 'grid-cell room-col';
       cell.dataset.room = room;
       cell.dataset.time = slot.start;
       cell.dataset.rowIdx = rowIdx;
+
+      // Apply room color as CSS variable for column border
+      const roomColor = state.roomColors[room] || '#E5E7EB';
+      cell.style.setProperty('--room-color', roomColor);
 
       // Check if this cell has a reservation
       const resInfo = resMap[room]?.find(ri => rowIdx >= ri.startIdx && rowIdx < ri.endIdx);
 
       if (resInfo) {
-        const color = state.roomColors[room] || '#E5E7EB';
+        const color = roomColor;
         cell.style.background = color;
         cell.className += ' res-cell';
 
@@ -1662,8 +1687,9 @@ function renderDayGrid() {
           cell.onclick = () => showDetailModal(resInfo.res);
         }
       } else {
-        // Empty cell
+        // Empty cell - apply very light room color tint
         cell.className += ' empty-cell' + (rowIdx % 2 === 1 ? ' half' : '');
+        cell.style.background = roomColor + '18'; // ~10% opacity hex
         cell.onclick = () => openFormModal(room, slot.start);
       }
 
@@ -2043,6 +2069,8 @@ function buildLegend() {
     const color = state.roomColors[room];
     const item = document.createElement('div');
     item.className = 'legend-item';
+    item.style.borderColor = color;
+    item.style.borderWidth = '2px';
     item.innerHTML = `<span class="legend-dot" style="background:${color}"></span>${escapeHtml(room)}`;
     container.appendChild(item);
   });
