@@ -70,6 +70,26 @@
       opacity:.9;
     }
 
+    /* Portal Link */
+    .portal-link{
+      display:inline-block;
+      font-size:13px;
+      padding:6px 12px;
+      border-radius:8px;
+      border:1px solid #1f9d55;
+      background:#1f9d55;
+      color:#fff;
+      text-decoration:none;
+      font-weight:500;
+      white-space:nowrap;
+    }
+    .portal-link:hover{
+      background:#177a43;
+      border-color:#177a43;
+      color:#fff;
+      text-decoration:none;
+    }
+
     /* Week Tabs */
     .week-tabs{
       display:flex;
@@ -792,6 +812,7 @@
     <div class="week-tabs" id="weekTabs">
       <!-- 7 day tabs injected -->
     </div>
+    <a href="<?= PORTAL_URL ?>" target="_top" class="portal-link">社内ポータルへ移動</a>
   </div>
 </div>
 
