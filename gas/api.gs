@@ -12,7 +12,17 @@ function getMasters() {
     console.error('Auto cleanup failed:', e);
   }
 
-  return readMasters_();
+  const masters = readMasters_();
+
+  // 作業員マスタ（外部スプレッドシート、24時間キャッシュ）
+  let workers = [];
+  try {
+    workers = getWorkersCached_();
+  } catch (e) {
+    console.error('Worker master fetch failed:', e);
+  }
+
+  return { ...masters, workers };
 }
 
 function getWindowBase() {

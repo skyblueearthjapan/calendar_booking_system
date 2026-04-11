@@ -964,9 +964,15 @@
           ※ 多目的ホールは大人数での立会など貸し切りの場合のみ<br>　 予約を入れてください。
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">作業者</label>
-        <select class="form-select" id="fName"></select>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">部署</label>
+          <select class="form-select" id="fDept" onchange="filterFNameByDept()"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">作業者</label>
+          <select class="form-select" id="fName"></select>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">お客様名</label>
@@ -1700,16 +1706,42 @@ function renderDayGrid() {
 // =========================
 // Form Modal
 // =========================
+// 作業員マスタ取得（外部シート取得失敗時は内部Masterのnamesにフォールバック）
+function getWorkerList() {
+  const workers = state.masters.workers || [];
+  if (workers.length > 0) return workers.slice();
+  return (state.masters.names || []).map(name => ({ name, department: '' }));
+}
+
+// 同姓同名がある場合のみ「氏名 (部署)」で区別表示
+function workerDisplayLabel(worker, workerList) {
+  const dup = workerList.filter(w => w.name === worker.name).length > 1;
+  if (dup && worker.department) {
+    return worker.name + ' (' + worker.department + ')';
+  }
+  return worker.name;
+}
+
 function buildFormOptions() {
-  // Names
-  const nameSel = document.getElementById('fName');
-  nameSel.innerHTML = '';
-  state.masters.names.forEach(n => {
+  // Departments (作業員マスタから生成)
+  const deptSel = document.getElementById('fDept');
+  deptSel.innerHTML = '';
+  const allOpt = document.createElement('option');
+  allOpt.value = '';
+  allOpt.textContent = '全て';
+  deptSel.appendChild(allOpt);
+
+  const workerList = getWorkerList();
+  const depts = [...new Set(workerList.map(w => w.department).filter(d => d))].sort();
+  depts.forEach(d => {
     const opt = document.createElement('option');
-    opt.value = n;
-    opt.textContent = n;
-    nameSel.appendChild(opt);
+    opt.value = d;
+    opt.textContent = d;
+    deptSel.appendChild(opt);
   });
+
+  // Names（部署フィルタ初期化、デフォルトは「全て」）
+  filterFNameByDept();
 
   // Rooms
   const roomSel = document.getElementById('fRoom');
@@ -1738,6 +1770,59 @@ function buildFormOptions() {
     optE.textContent = s.end;
     endSel.appendChild(optE);
   });
+}
+
+function filterFNameByDept() {
+  const dept = document.getElementById('fDept').value;
+  const nameSel = document.getElementById('fName');
+  const prevValue = nameSel.value;
+  nameSel.innerHTML = '';
+
+  const workerList = getWorkerList();
+  const filtered = dept ? workerList.filter(w => w.department === dept) : workerList;
+
+  filtered.forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w.name;
+    opt.textContent = workerDisplayLabel(w, filtered);
+    nameSel.appendChild(opt);
+  });
+
+  // 前の選択を保持（フィルタ後にも存在する場合）
+  if (prevValue && filtered.some(w => w.name === prevValue)) {
+    nameSel.value = prevValue;
+  }
+}
+
+function filterEditNameByDept() {
+  const dept = document.getElementById('editDept').value;
+  const nameSel = document.getElementById('editName');
+  const prevValue = nameSel.value;
+  nameSel.innerHTML = '';
+
+  const workerList = getWorkerList();
+  const currentName = state.editingReservation ? state.editingReservation.name : '';
+
+  // マスタから消えた既存予約作業者をフォールバックエントリとして追加
+  let extended = workerList;
+  if (currentName && !workerList.some(w => w.name === currentName)) {
+    extended = workerList.concat([{ name: currentName, department: '' }]);
+  }
+
+  const filtered = dept ? extended.filter(w => w.department === dept) : extended;
+
+  filtered.forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w.name;
+    opt.textContent = workerDisplayLabel(w, filtered);
+    nameSel.appendChild(opt);
+  });
+
+  if (prevValue && filtered.some(w => w.name === prevValue)) {
+    nameSel.value = prevValue;
+  } else if (currentName && filtered.some(w => w.name === currentName)) {
+    nameSel.value = currentName;
+  }
 }
 
 function openFormModal(room, startTime) {
@@ -1842,8 +1927,23 @@ function renderDetailModal() {
       `<option value="${escapeHtml(room)}" ${room === r.room ? 'selected' : ''}>${escapeHtml(room)}</option>`
     ).join('');
 
-    const nameOptions = state.masters.names.map(name =>
-      `<option value="${escapeHtml(name)}" ${name === r.name ? 'selected' : ''}>${escapeHtml(name)}</option>`
+    // 既存予約の作業者から所属部署を逆引き（マスタから消えた人も保護）
+    const workerList = getWorkerList();
+    const extended = r.name && !workerList.some(w => w.name === r.name)
+      ? workerList.concat([{ name: r.name, department: '' }])
+      : workerList;
+    const currentWorker = extended.find(w => w.name === r.name);
+    const currentDept = currentWorker ? currentWorker.department : '';
+
+    const depts = [...new Set(extended.map(w => w.department).filter(d => d))].sort();
+    const deptOptions = ['<option value="" ' + (currentDept ? '' : 'selected') + '>全て</option>']
+      .concat(depts.map(d =>
+        `<option value="${escapeHtml(d)}" ${d === currentDept ? 'selected' : ''}>${escapeHtml(d)}</option>`
+      )).join('');
+
+    const filteredWorkers = currentDept ? extended.filter(w => w.department === currentDept) : extended;
+    const nameOptions = filteredWorkers.map(w =>
+      `<option value="${escapeHtml(w.name)}" ${w.name === r.name ? 'selected' : ''}>${escapeHtml(workerDisplayLabel(w, filteredWorkers))}</option>`
     ).join('');
 
     const startOptions = state.masters.slots.map(s =>
@@ -1873,9 +1973,15 @@ function renderDetailModal() {
         <label class="form-label">会議室</label>
         <select class="form-select" id="editRoom">${roomOptions}</select>
       </div>
-      <div class="form-group">
-        <label class="form-label">作業者</label>
-        <select class="form-select" id="editName">${nameOptions}</select>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">部署</label>
+          <select class="form-select" id="editDept" onchange="filterEditNameByDept()">${deptOptions}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">作業者</label>
+          <select class="form-select" id="editName">${nameOptions}</select>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">お客様名</label>
