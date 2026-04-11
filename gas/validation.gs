@@ -25,7 +25,7 @@ function parseDateTime_(dateStr, timeStr) {
 }
 
 function assertPayload_(p) {
-  const required = ['date','startTime','endTime','room','name'];
+  const required = ['date','startTime','endTime','room','name','customerName'];
   required.forEach(k => {
     if (!p[k] || !String(p[k]).trim()) throw new Error(`Missing field: ${k}`);
   });

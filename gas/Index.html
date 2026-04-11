@@ -969,7 +969,7 @@
         <select class="form-select" id="fName"></select>
       </div>
       <div class="form-group">
-        <label class="form-label">お客様名（任意）</label>
+        <label class="form-label">お客様名</label>
         <input type="text" class="form-input" id="fCustomer" placeholder="例：株式会社〇〇 ご担当：△△様" />
       </div>
       <div class="form-group">
@@ -1780,7 +1780,7 @@ async function submitReservation() {
   };
 
   // バリデーション
-  if (!payload.date || !payload.startTime || !payload.endTime || !payload.room || !payload.name) {
+  if (!payload.date || !payload.startTime || !payload.endTime || !payload.room || !payload.name || !(payload.customerName || '').trim()) {
     hint.textContent = '必須項目を入力してください';
     return;
   }
@@ -1878,7 +1878,7 @@ function renderDetailModal() {
         <select class="form-select" id="editName">${nameOptions}</select>
       </div>
       <div class="form-group">
-        <label class="form-label">お客様名（任意）</label>
+        <label class="form-label">お客様名</label>
         <input type="text" class="form-input" id="editCustomer" value="${escapeHtml(r.customerName || '')}" />
       </div>
       <div class="form-group">
@@ -1946,7 +1946,7 @@ async function submitUpdate() {
   };
 
   // バリデーション
-  if (!payload.date || !payload.startTime || !payload.endTime || !payload.room || !payload.name) {
+  if (!payload.date || !payload.startTime || !payload.endTime || !payload.room || !payload.name || !(payload.customerName || '').trim()) {
     hint.textContent = '必須項目を入力してください';
     return;
   }
