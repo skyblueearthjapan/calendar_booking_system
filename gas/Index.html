@@ -118,23 +118,23 @@
     .week-tab .date{font-size:13px;font-weight:800}
     .week-tab .count{font-size:10px;opacity:.85;margin-top:2px}
 
-    /* Modal Date Tabs (7-day picker) */
+    /* Modal Date Tabs (7-day picker) - 1行に固定 */
     .date-tabs{
       display:flex;
-      gap:6px;
-      flex-wrap:wrap;
+      gap:3px;
+      flex-wrap:nowrap;
     }
     .date-tab{
-      flex:1 1 auto;
-      min-width:54px;
-      padding:8px 4px;
+      flex:1 1 0;
+      min-width:0;
+      padding:6px 2px;
       border:2px solid var(--line);
       border-radius:6px;
       background:#fff;
       color:var(--text);
       cursor:pointer;
       text-align:center;
-      line-height:1.3;
+      line-height:1.2;
       transition:all .12s ease;
       font-family:inherit;
     }
@@ -147,8 +147,8 @@
       color:#fff;
       border-color:var(--navy);
     }
-    .date-tab .date-num{font-size:14px;font-weight:800}
-    .date-tab .date-dow{font-size:10px;opacity:.85;margin-top:2px}
+    .date-tab .date-num{font-size:12px;font-weight:800}
+    .date-tab .date-dow{font-size:10px;opacity:.85;margin-top:1px}
     .date-tab.out-of-range{
       border-color:#F59E0B;
       background:#FEF3C7;
@@ -158,6 +158,23 @@
       background:#F59E0B;
       color:#fff;
       border-color:#F59E0B;
+    }
+    /* 選択中日付の横長表示 */
+    .date-selected-display{
+      margin-top:8px;
+      padding:10px 12px;
+      background:#EFF6FF;
+      border:1px solid #BFDBFE;
+      border-radius:6px;
+      text-align:center;
+      font-weight:700;
+      font-size:15px;
+      color:var(--navy);
+    }
+    .date-selected-display.out-of-range{
+      background:#FEF3C7;
+      border-color:#FCD34D;
+      color:#92400E;
     }
 
     /* Main Container */
@@ -988,6 +1005,7 @@
       <div class="form-group">
         <label class="form-label">日付</label>
         <div class="date-tabs" id="fDateTabs"></div>
+        <div class="date-selected-display" id="fDateDisplay"></div>
         <input type="hidden" id="fDate" />
       </div>
       <div class="form-row">
@@ -1591,7 +1609,7 @@ function selectDate(dateStr) {
 }
 
 // モーダル用：7日タブの日付ピッカーを描画
-function buildDateTabs(containerId, hiddenId, selectedDate) {
+function buildDateTabs(containerId, hiddenId, selectedDate, displayId) {
   const container = document.getElementById(containerId);
   const hidden = document.getElementById(hiddenId);
   if (!container || !hidden) return;
@@ -1602,6 +1620,17 @@ function buildDateTabs(containerId, hiddenId, selectedDate) {
   if (selectedDate && !days.includes(selectedDate)) {
     days.unshift(selectedDate);
   }
+
+  // 選択中日付の横長表示を更新
+  const updateDisplay = (d) => {
+    if (!displayId) return;
+    const disp = document.getElementById(displayId);
+    if (!disp) return;
+    const outOfRange = !state.weekDays.includes(d);
+    disp.className = 'date-selected-display' + (outOfRange ? ' out-of-range' : '');
+    const parts = d.split('-');
+    disp.textContent = `${parseInt(parts[1])}月${parseInt(parts[2])}日（${getDayOfWeek(d)}）` + (outOfRange ? ' ※ 予約可能期間外' : '');
+  };
 
   days.forEach(d => {
     const tab = document.createElement('button');
@@ -1620,11 +1649,14 @@ function buildDateTabs(containerId, hiddenId, selectedDate) {
       hidden.value = d;
       container.querySelectorAll('.date-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
+      updateDisplay(d);
     };
     container.appendChild(tab);
   });
 
-  hidden.value = selectedDate || (days[0] || '');
+  const initial = selectedDate || (days[0] || '');
+  hidden.value = initial;
+  if (initial) updateDisplay(initial);
 }
 
 // =========================
@@ -1903,7 +1935,7 @@ function filterEditNameByDept() {
 }
 
 function openFormModal(room, startTime) {
-  buildDateTabs('fDateTabs', 'fDate', state.selectedDate);
+  buildDateTabs('fDateTabs', 'fDate', state.selectedDate, 'fDateDisplay');
   document.getElementById('fRoom').value = room;
   document.getElementById('fStart').value = startTime;
 
@@ -2041,6 +2073,7 @@ function renderDetailModal() {
       <div class="form-group">
         <label class="form-label">日付</label>
         <div class="date-tabs" id="editDateTabs"></div>
+        <div class="date-selected-display" id="editDateDisplay"></div>
         <input type="hidden" id="editDate" value="${escapeHtml(r.date)}" />
       </div>
       <div class="form-row">
@@ -2082,7 +2115,7 @@ function renderDetailModal() {
       </div>
     `;
     // 編集モーダルの日付タブを描画
-    buildDateTabs('editDateTabs', 'editDate', r.date);
+    buildDateTabs('editDateTabs', 'editDate', r.date, 'editDateDisplay');
   } else {
     // 表示モード
     body.innerHTML = `
