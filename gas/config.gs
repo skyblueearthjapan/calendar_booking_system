@@ -41,7 +41,7 @@ const CFG = {
     START: '08:00',
     END: '18:00',
     SLOT_MIN: 30,
-    WINDOW_DAYS: 7, // 今日から7日（1週間）
+    WINDOW_DAYS: 28, // 今日から28日（4週間）
   },
 
   // 会議室ごとの固定色（お好みで変更）

@@ -128,11 +128,13 @@
       display:flex;
       gap:3px;
       flex-wrap:nowrap;
+      overflow-x:auto;   /* 4週間分(28日)を横スクロールで選択可能に */
+      padding-bottom:4px;
     }
     .date-tab{
-      flex:1 1 0;
-      min-width:0;
-      padding:6px 2px;
+      flex:0 0 auto;
+      min-width:48px;
+      padding:6px 6px;
       border:2px solid var(--line);
       border-radius:6px;
       background:#fff;
@@ -224,6 +226,30 @@
       transition:.15s;
     }
     .nav-btn:hover{background:var(--bg)}
+
+    /* 週タブと前週/翌週ボタンを同じ段に横並び */
+    .week-nav-row{
+      display:flex;
+      align-items:stretch;
+      gap:6px;
+      flex:1 1 auto;
+      min-width:0;
+      justify-content:center;
+    }
+    /* 前週/翌週：日付タブ列の左右端に同じ高さで配置 */
+    .week-arrow{
+      flex:0 0 auto;
+      white-space:nowrap;
+      display:flex;
+      align-items:center;
+    }
+    /* 週ナビ：薄い黄色で差別化 */
+    .nav-btn-week{
+      background:#FEF9C3;   /* 薄い黄色 (yellow-100) */
+      border-color:#FDE68A; /* amber-200 */
+      color:#854D0E;        /* amber-800 */
+    }
+    .nav-btn-week:hover{background:#FEF08A} /* yellow-200 */
 
     /* Grid Table (Excel-like) */
     .grid-wrap{
@@ -959,8 +985,12 @@
       <span>会議室予約</span>
       <span class="badge">Web入力 / シート表示</span>
     </div>
-    <div class="week-tabs" id="weekTabs">
-      <!-- 7 day tabs injected -->
+    <div class="week-nav-row">
+      <button class="nav-btn nav-btn-week week-arrow" onclick="shiftWeek(-1)">&#9664; 前週</button>
+      <div class="week-tabs" id="weekTabs">
+        <!-- 7 day tabs injected -->
+      </div>
+      <button class="nav-btn nav-btn-week week-arrow" onclick="shiftWeek(1)">翌週 &#9654;</button>
     </div>
     <a href="<?= PORTAL_URL ?>" target="_top" class="portal-link">社内ポータルへ移動</a>
   </div>
@@ -1601,11 +1631,20 @@ async function loadWeekData() {
   renderWeekTabs();
 }
 
+// 選択日を含む7日ブロック（その週）を返す。週ナビでこのブロックが切り替わる
+function getWeekBlockOf(dateStr) {
+  const all = state.weekDays;
+  if (!all.length) return [];
+  const idx = all.indexOf(dateStr);
+  const base = idx >= 0 ? Math.floor(idx / 7) * 7 : 0;
+  return all.slice(base, base + 7);
+}
+
 function renderWeekTabs() {
   const container = document.getElementById('weekTabs');
   container.innerHTML = '';
 
-  state.weekDays.forEach(d => {
+  getWeekBlockOf(state.selectedDate).forEach(d => {
     const tab = document.createElement('div');
     tab.className = 'week-tab' + (d === state.selectedDate ? ' active' : '');
     tab.onclick = () => selectDate(d);
@@ -2333,6 +2372,12 @@ function shiftDay(delta) {
 
 function goToday() {
   selectDate(state.window.today);
+}
+
+// 週ナビ（前週／翌週）。選択日を±7日し、週タブもその週に追従する
+function shiftWeek(delta) {
+  const next = clampWindow(addDays(state.selectedDate, delta * 7));
+  selectDate(next);
 }
 
 // =========================
